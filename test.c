@@ -4,6 +4,13 @@
 #include <string.h>
 #include "simplefs.h"
 
+void test_size(){
+    printf("Hello world \n");
+    char chararray[10] = { 0 };
+    size_t len = strlen(chararray);
+    printf("length of the array %f \n", len);
+}
+
 int main(int argc, char **argv)
 {
 
@@ -37,7 +44,7 @@ int main(int argc, char **argv)
     sfs_create ("file2.bin");
     sfs_create ("file3.bin");
     */
-    printf("Hello world \n");
+    test_size();
 
     return (0);
 

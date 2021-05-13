@@ -7,6 +7,38 @@
 #include <fcntl.h>
 #include "simplefs.h"
 
+// Visualisations for implementation reference
+// directory entry [filename | idx_FCB]
+// FCB [is_used | idx_block_address | file_size]
+// bitmap[0, 0, 0, 0, 0, ...] -> Block {0,1,2,3,4} are not used
+
+// Definitions
+// block access related (4 KB BLOCKSIZE defines in simplefs.h)
+#define SUPERBLOCK_START 0 // Block 0
+#define SUPERBLOCK_COUNT 1 
+#define BITMAP_START 1 // Blocks {1,2,3,4}
+#define BITMAP_COUNT 4
+#define ROOT_DIR_START 5 // Blocks {5,6,7,8}
+#define ROOT_DIR_COUNT 4
+#define FCB_START 9 // Blocks {9, 10, 11, 12}
+#define FCB_COUNT 4
+// file system structure related
+#define DIR_ENTRY_SIZE 128 // Bytes
+#define DIR_ENTRY_PER_BLOCK 32 // 4KB (BLOCKSIZE)/128 Bytes (DIR_ENTRY_SIZE)
+#define DIR_ENTRY_COUNT 128 // 4(ROOT_DIR_COUNT) * 32 (DIR_ENTRY_PER_BLOCK)
+#define FCB_SIZE 128 // Bytes
+#define FCB_PER_BLOCK 32 // 4KB (BLOCKSIZE)/128 Bytes (FCB_SIZE)
+#define DISK_PTR_SIZE 4 // Bytes (32 bits)
+#define BLOCK_NO_SIZE 4 // Bytes (32 bits)
+#define INDEXING_BLOCK_PTR_COUNT 1024 // (4KB  (BLOCKSIZE)  / 4 Bytes (DISK_PTR_SIZE))
+#define MAX_NOF_FILES 128 // same as (DIR_ENTRY_COUNT)
+#define MAX_FILENAME_LENGTH 110 // characters
+#define MAX_FILE_SIZE 4194304 // 4MB = 4KB (BLOCKSIZE) * (4KB / 4 Bytes)(INDEXING_BLOCK_PTR_COUNT)
+// Offsets for iterating in the filesystem structure
+
+
+
+
 
 // Global Variables =======================================
 int vdisk_fd; // Global virtual disk file descriptor. Global within the library.
