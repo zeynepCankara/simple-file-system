@@ -4,11 +4,18 @@
 #include <string.h>
 #include "simplefs.h"
 
+
+// TODO(zcankara) Delete test_size
 void test_size(){
     printf("Hello world \n");
-    char chararray[10] = { 0 };
-    size_t len = strlen(chararray);
-    printf("length of the array %f \n", len);
+    char *str = malloc(sizeof(char)*1); //allocate space for 1 chars
+    char c = 'a';
+    str[0] = c;
+    printf("size of str: %ld \n",  sizeof(str));
+    char x[10];
+    int elements_in_x = sizeof(x) / sizeof(x[0]);
+    printf("elements_in_x %d \n",  elements_in_x);
+    
 }
 
 int main(int argc, char **argv)

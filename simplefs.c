@@ -38,8 +38,6 @@
 
 
 
-
-
 // Global Variables =======================================
 int vdisk_fd; // Global virtual disk file descriptor. Global within the library.
               // Will be assigned with the vsfs_mount call.
@@ -97,7 +95,13 @@ int create_format_vdisk (char *vdiskname, unsigned int m)
     int count;
     size  = num << m;
     count = size / BLOCKSIZE;
-    //    printf ("%d %d", m, size);
+    printf ("LOG(create_format_vdisk): (m: %d, size: %d) \n", m, size);
+    int header_count = SUPERBLOCK_COUNT + ROOT_DIR_COUNT + FCB_COUNT;
+    if (count < header_count)
+    {
+        printf("ERROR: Larger disk size required!\n"); 
+        return -1;
+    }
     sprintf (command, "dd if=/dev/zero of=%s bs=%d count=%d",
              vdiskname, BLOCKSIZE, count);
     //printf ("executing command = %s\n", command);
@@ -105,6 +109,15 @@ int create_format_vdisk (char *vdiskname, unsigned int m)
 
     // now write the code to format the disk below.
     // .. your code...
+
+    vdisk_fd = open(vdiskname, O_RDWR);
+    int data_count = count - header_count;
+    init_superblock(data_count);
+    //init_bitmap();
+    //init_FCB(data_count);
+    init_root_directory();
+    fsync(vdisk_fd); // copy everything in memory to disk
+    close(vdisk_fd);
     
     return (0); 
 }
@@ -165,3 +178,33 @@ int sfs_delete(char *filename)
     return (0); 
 }
 
+
+/**********************************************************************
+  Helper Functions
+***********************************************************************/
+
+void init_superblock(int data_count){
+    char ablock[BLOCKSIZE];
+    ((int *)(ablock))[0] = data_count;  // block0 reserved for the superblock
+    ((int *)(ablock + 4))[0] = 0;      // the FCB entry (empty)
+    ((int *)(ablock + 8))[0] = data_count;  // free blocks
+    ((int *)(ablock + 12))[0] = 0; // number of files
+    write_block((void *)ablock, SUPERBLOCK_START);
+}
+
+
+void init_root_directory()
+{
+    char block[BLOCKSIZE];
+    int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
+    int notUsedFlag = 48;
+    for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
+    {
+        int startByte = j * DIR_ENTRY_SIZE;
+        ((char *)(block + startByte + offsetFromStart))[0] = notUsedFlag;
+    }
+    for (int i = 0; i < ROOT_DIR_COUNT; i++)
+    {
+        write_block((void *)block, ROOT_DIR_START + i);
+    }
+}

@@ -26,4 +26,8 @@ int sfs_append(int fd, void *buf, int n);
 
 int sfs_delete(char *filename);
 
+// helpers //
 
+void init_superblock(int data_count);
+
+void init_root_directory();
