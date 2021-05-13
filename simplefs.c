@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "simplefs.h"
+#include <stdbool.h>
+#include <string.h>
 
 // Visualisations for implementation reference
 // directory entry [filename | idx_FCB]
@@ -36,6 +38,8 @@
 #define MAX_NOF_FILES 128 // same as (DIR_ENTRY_COUNT)
 #define MAX_FILENAME_LENGTH 110 // characters
 #define MAX_FILE_SIZE 4194304 // 4MB = 4KB (BLOCKSIZE) * (4KB / 4 Bytes)(INDEXING_BLOCK_PTR_COUNT)
+#define NOT_USED_FLAG 0
+#define USED_FLAG 1
 // Offsets for iterating in the filesystem structure
 
 // structures
@@ -179,6 +183,80 @@ int sfs_umount ()
 
 int sfs_create(char *filename)
 {
+    //  check number of files available
+    if (file_count == MAX_NOF_FILES)
+    {
+        printf("ERROR: No capacity available for file creation!\n");
+        return -1;
+    }
+
+    // check whether file with same name exist in the system
+    char block[BLOCKSIZE];
+    // 1) iterate over root directory blocks
+    int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
+    for (int i = 0; i < ROOT_DIR_COUNT; i++)
+    {
+        read_block((void *)block, ROOT_DIR_START + i);
+        // 2) iterate over directory entries
+        for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
+        {
+            int startByte = j * DIR_ENTRY_SIZE;
+            char isUsed = ((char *)(block + startByte + offsetFromStart))[0];
+            char name[MAX_FILENAME_LENGTH];
+            memcpy(name, ((char *)(block + startByte)), MAX_FILENAME_LENGTH);
+            if (isUsed == USED_FLAG && strcmp(name, filename) == 0)
+            {
+                printf("ERROR: File with the same name already created!\n");
+                return -1;
+            }
+        }
+    }
+
+    int dirBlock = -1; // relative to start of root directory
+    int dirBlockOffset = -1;
+    bool found = false;
+    for (int i = 0; i < ROOT_DIR_COUNT; i++)
+    {
+        read_block((void *)block, ROOT_DIR_START + i);
+        for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
+        {
+            int startByte = j * DIR_ENTRY_SIZE;
+            char isUsed = ((char *)(block + startByte + offsetFromStart))[0];
+            if (isUsed == NOT_USED_FLAG)
+            {
+                dirBlock = i;
+                dirBlockOffset = j;
+                printf("LOG(sfs_create): Empty dir entry is found %d, %d!\n", i, j);
+                found = true;
+                break;
+            }
+        }
+        if (found)
+        {
+            break;
+        }
+    }
+
+    int startByte = dirBlockOffset * DIR_ENTRY_SIZE;
+    // write the filename
+    for (int i = 0; i < strlen(filename); i++)
+    {
+        ((char *)(block + startByte + i))[0] = filename[i];
+    }
+    memcpy(((char *)(block + startByte)), filename, MAX_FILENAME_LENGTH);
+    ((int *)(block + startByte + MAX_FILENAME_LENGTH))[0] = 0;   // size of the file
+    ((int *)(block + startByte + (MAX_FILENAME_LENGTH + 4)))[0] = -1;  // index to the FCB
+    ((char *)(block + startByte + (MAX_FILENAME_LENGTH + 8)))[0] = USED_FLAG; // mark as used
+
+    int res = write_block((void *)block, dirBlock + ROOT_DIR_START);
+    if (res == -1)
+    {
+        printf("ERROR: write error in create!\n");
+        return -1;
+    }
+    // increment the number of files
+    file_count++;
+
     return (0);
 }
 
@@ -265,11 +343,10 @@ void init_root_directory()
     char block[BLOCKSIZE];
     // TODO(zcankara) decide necessary or not
     int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
-    int notUsedFlag = 0;
     for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
     {
         int startByte = j * DIR_ENTRY_SIZE;
-        ((char *)(block + startByte + offsetFromStart))[0] = notUsedFlag;
+        ((char *)(block + startByte + offsetFromStart))[0] = NOT_USED_FLAG;
     }
     // write to the disk
     for (int i = 0; i < ROOT_DIR_COUNT; i++)

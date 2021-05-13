@@ -39,6 +39,10 @@ void timing_experiments(){
     int mountRes = sfs_mount(vfs_name);
     is_res_pass(mountRes, counter);
 
+    // create an example file
+    counter++;
+    int res_create_file = sfs_create("vfs.txt");
+    is_res_pass(res_create_file, counter);
     
 }
 
