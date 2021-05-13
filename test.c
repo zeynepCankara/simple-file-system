@@ -3,6 +3,36 @@
 #include <unistd.h>
 #include <string.h>
 #include "simplefs.h"
+#include <sys/time.h>
+#include <limits.h>
+
+
+void is_res_pass(int res, int counter)
+{
+    if (res < 0)
+    {
+        printf("ERROR: check the  %d!\n", counter);
+        exit(-1);
+    }
+}
+
+void timing_experiments(){
+    struct timeval start;
+    struct timeval end;
+    int res_create;
+    gettimeofday(&start, NULL);
+    int counter = 0;
+    char *vfs_name = "vfs";
+    res_create = create_format_vdisk(vfs_name, 20); //NOTE: Max disk size 128 MB
+    is_res_pass(res_create, counter);
+    gettimeofday(&end, NULL);
+
+    printf("** create_format_vdisk ***\n");
+    printf("\tSeconds (s): %ld\n", end.tv_sec - start.tv_sec);
+    printf("\tMicroseconds (ms): %ld\n",
+           (end.tv_sec * 1000000 + end.tv_usec) -
+               (start.tv_sec * 1000000 + start.tv_usec));
+}
 
 
 // TODO(zcankara) Delete test_size
@@ -51,7 +81,8 @@ int main(int argc, char **argv)
     sfs_create ("file2.bin");
     sfs_create ("file3.bin");
     */
-    test_size();
+    // test_size();
+    timing_experiments();
 
     return (0);
 
