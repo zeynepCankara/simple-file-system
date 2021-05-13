@@ -47,7 +47,7 @@ void timing_experiments(){
     int *myFileDescriptors = malloc(1000000 * sizeof(int));
     char myFileName[1000000];
     int lastFileName;
-    for (int i = 0; i < 127; i++) // populate the directory
+    for (int i = 0; i < 120; i++) // populate the directory
     {
         sprintf(myFileName, "%d", i);
         res_create_file = sfs_create(myFileName);
@@ -57,6 +57,25 @@ void timing_experiments(){
         }
         lastFileName = i;
     }
+
+    printf("index of the last opened file: %d. \n", lastFileName);
+    printf("test: sfs_open\n");
+    int *fileDescriptors = malloc((lastFileName + 1) * sizeof(int));
+    int lastOpenFileIndex;
+    for (int i = 0; i <= lastFileName; i++)
+    {
+        sprintf(myFileName, "%d", i);
+        printf("file %d opened. \n", i);
+        fileDescriptors[i] = sfs_open(myFileName, MODE_APPEND);
+        if (fileDescriptors[i] < 0)
+        {
+            break;
+        }
+        lastOpenFileIndex = i;
+    }
+
+    printf("test: sfs_append\n");
+
 }
 
 

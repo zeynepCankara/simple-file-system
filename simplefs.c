@@ -37,6 +37,7 @@
 #define INDEXING_BLOCK_PTR_COUNT 1024 // (4KB  (BLOCKSIZE)  / 4 Bytes (DISK_PTR_SIZE))
 #define MAX_NOF_FILES 128 // same as (DIR_ENTRY_COUNT)
 #define MAX_FILENAME_LENGTH 110 // characters
+#define MAX_NOF_OPEN_FILES 32 // same as DIR_ENTRY_PER_BLOCK
 #define MAX_FILE_SIZE 4194304 // 4MB = 4KB (BLOCKSIZE) * (4KB / 4 Bytes)(INDEXING_BLOCK_PTR_COUNT)
 #define NOT_USED_FLAG 0
 #define USED_FLAG 1
@@ -46,6 +47,7 @@
 struct DirEntry
 {
     char filename[MAX_FILENAME_LENGTH];
+    int size; //TODO: not sure needed or not
     int fcbIndex;
 };
 
@@ -263,7 +265,69 @@ int sfs_create(char *filename)
 
 int sfs_open(char *file, int mode)
 {
-    return (0); 
+    // check limit of opening files
+    if (open_file_count == MAX_NOF_OPEN_FILES)
+    {
+        printf("ERROR: Can't open more files!\n");
+        return -1;
+    }
+
+    // check maximum number of files opened
+    for (int i = 0; i < MAX_NOF_OPEN_FILES; i++)
+    {
+        if (open_file_table[i].dirBlock > -1 && strcmp(open_file_table[i].directoryEntry.filename, file) == 0)
+        { 
+            printf("ERROR: File already opened!\n");
+            return -1;
+        }
+    }
+
+    // find space in the open file table
+    int fd = -1;
+    for (int i = 0; i < MAX_NOF_OPEN_FILES; i++)
+    {
+        if (open_file_table[i].dirBlock == -1)
+        { 
+            // available block position
+            fd = i;
+            break;
+        }
+    }
+    // find in the directory structure
+    bool found = false;
+    char block[BLOCKSIZE];
+    int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
+    // iterate through root directory blocks
+    for (int i = 0; i < ROOT_DIR_COUNT; i++)
+    {
+        read_block((void *)block, ROOT_DIR_START + i);
+        // iterate through the directory entries
+        for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
+        {
+            int startByte = j * DIR_ENTRY_SIZE;
+            char isUsed = ((char *)(block + startByte + offsetFromStart))[0];
+            char filename[MAX_FILENAME_LENGTH];
+            memcpy(filename, ((char *)(block + startByte)), MAX_FILENAME_LENGTH);
+            if (isUsed == USED_FLAG && strcmp(file, filename) == 0)
+            { 
+                // the file found in the directory structure
+                // init the attributes of the directory entry
+                open_file_table[fd].dirBlock = i;
+                open_file_table[fd].dirBlockOffset = j;
+                open_file_table[fd].openMode = mode;
+                open_file_table[fd].readPointer = 0;
+                memcpy(open_file_table[fd].directoryEntry.filename, filename, MAX_FILENAME_LENGTH);
+                open_file_table[fd].directoryEntry.size = ((int *)(block + startByte + MAX_FILENAME_LENGTH))[0];
+                open_file_table[fd].directoryEntry.fcbIndex = ((int *)(block + startByte + (MAX_FILENAME_LENGTH+4)))[0];
+                open_file_count++;
+                found = true;
+                break;
+            }
+        }
+        if (found)
+            break;
+    }
+    return fd;
 }
 
 int sfs_close(int fd){
