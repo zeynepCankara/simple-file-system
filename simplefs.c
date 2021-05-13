@@ -372,6 +372,67 @@ int sfs_getsize (int  fd)
 }
 
 int sfs_read(int fd, void *buf, int n){
+    if (is_file_opened(fd) == -1)
+    {
+        printf("ERROR: File not opened yet!\n");
+        return -1;
+    }
+    // mode should be read
+    if (open_file_table[fd].openMode == MODE_APPEND)
+    {
+        printf("ERROR: can't read in APPEND mode!\n");
+        return -1;
+    }
+    // get the data about the directory entry
+    int size_file = open_file_table[fd].directoryEntry.size;
+    int fcb_index_file = open_file_table[fd].directoryEntry.fcbIndex;
+    int read_ptr_file = open_file_table[fd].readPointer;
+    int end_read_ptr_file = read_ptr_file + n;
+    if (size_file < end_read_ptr_file)
+    {
+        printf("ERROR: No space to read exactly n bytes\n");
+        return -1;
+    }
+
+    // find the block range for acessing data in the file
+    int start_block_count = read_ptr_file  / BLOCKSIZE;
+    int start_block_offset = read_ptr_file  % BLOCKSIZE;
+
+    int end_block_count = end_read_ptr_file  / BLOCKSIZE;
+    int end_block_offset = end_read_ptr_file  % BLOCKSIZE;
+    printf("LOG(sfs_read)\n");
+    printf("\tLOG(set_directory_entry): (start_block_count: %d, start_block_offset: %d ) \n", start_block_count, start_block_offset);
+    printf("\tLOG(set_directory_entry): (end_block_count: %d, end_block_offset: %d ) \n",  end_block_count, end_block_offset);
+
+    void *buf_ptr = buf;
+    char block[BLOCKSIZE];
+    // access the data from indexed allocation scheme
+    int fcb_entry_idx = 0;
+    int index_block_ptr;
+    bool found = false;
+    // access the index block address
+    for (int i = 0; i < FCB_COUNT; i++)
+    {
+        for (int j = 0; j < FCB_PER_BLOCK; j++)
+        {
+            ((int *)(block + j * FCB_SIZE))[0] = 0;
+            if(fcb_entry_idx  == fcb_index_file){
+                index_block_ptr = ((int *)(block + j * FCB_SIZE + 4))[0];
+                found = true;
+                break;
+            }
+            fcb_entry_idx++;
+        }
+        if(found){
+            break;
+        }
+    }
+    // note that index block is the block where the file allocated
+    printf("\tLOG(sfs_read): (index_block_ptr: %d ) \n",  index_block_ptr);
+
+
+    // increment the file pointer
+    open_file_table[fd].readPointer = end_read_ptr_file;
     return (0); 
 }
 
