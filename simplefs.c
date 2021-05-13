@@ -177,6 +177,17 @@ int sfs_mount (char *vdiskname)
 // already implemented
 int sfs_umount ()
 {
+    // save the superblock data to the disk
+    set_superblock();
+    for (int i = 0; i < MAX_NOF_OPEN_FILES; i++)
+    {
+        printf("LOG(sfs_umount): directory block no: %d\n", open_file_table[i].dirBlock);
+        if (open_file_table[i].dirBlock > -1)
+        {
+            // close the open files
+            sfs_close(i);
+        }
+    }
     fsync (vdisk_fd); // copy everything in memory to disk
     close (vdisk_fd);
     return (0); 

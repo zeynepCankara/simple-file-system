@@ -116,6 +116,14 @@ void timing_experiments(){
         printf("ERROR: Can't reopened the file that is closed!\n");
         return;
     }
+
+    printf("test: sfs_umount\n");
+    int res_umount = sfs_umount();
+    if (res_umount < 0)
+    {
+        printf("ERROR: Can't umount the file system!\n");
+    }
+    printf("Tests successfully passed!\n");
 }
 
 
