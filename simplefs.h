@@ -35,3 +35,13 @@ void init_bitmap();
 void init_FCB(int data_count);
 
 void init_root_directory();
+
+
+// getters //
+void get_superblock();
+
+void get_bitmap();
+
+void get_root_dir_entry();
+
+void get_fcb();

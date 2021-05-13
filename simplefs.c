@@ -46,6 +46,11 @@ int vdisk_fd; // Global virtual disk file descriptor. Global within the library.
               // Any function in this file can use this.
               // Applications will not use  this directly. 
 // ========================================================
+// read from superblock (Block 0)
+int data_count;
+int empty_FCB_count;
+int free_block_count;
+int file_count;
 
 
 // read block k from disk (virtual disk) into buffer block.
@@ -244,4 +249,31 @@ void init_root_directory()
     {
         write_block((void *)block, ROOT_DIR_START + i);
     }
+}
+
+
+// getters to access disk blocks
+void get_superblock(){
+    char block[BLOCKSIZE];
+    read_block((void *)block, SUPERBLOCK_START);
+    data_count = ((int *)(block))[0];
+    empty_FCB_count = ((int *)(block + 4))[0];
+    free_block_count = ((int *)(block + 8))[0];
+    file_count = ((int *)(block + 12))[0];
+    printf("LOG(get_superblock): (data_count: %d) \n", data_count);
+    printf("LOG(get_superblock): (empty FCB: %d) \n",  empty_FCB_count);
+    printf("LOG(get_superblock): (free block count: %d) \n", free_block_count);
+    printf("LOG(get_superblock): (file count: %d) \n", file_count);
+}
+
+void get_bitmap(){
+    //return (0);
+}
+
+void get_root_dir_entry(){
+    //return (0);
+}
+
+void get_fcb(){
+    //return (0);
 }

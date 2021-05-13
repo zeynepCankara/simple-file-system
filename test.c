@@ -32,6 +32,8 @@ void timing_experiments(){
     printf("\tMicroseconds (ms): %ld\n",
            (end.tv_sec * 1000000 + end.tv_usec) -
                (start.tv_sec * 1000000 + start.tv_usec));
+    
+    get_superblock();
 }
 
 
