@@ -38,6 +38,12 @@ void init_root_directory();
 
 void clear_open_file_table();
 
+int is_file_opened(int fd);
+
+// setters //
+void set_superblock();
+
+void set_directory_entry(int fd);
 
 // getters //
 void get_superblock();

@@ -47,7 +47,7 @@ void timing_experiments(){
     int *myFileDescriptors = malloc(1000000 * sizeof(int));
     char myFileName[1000000];
     int lastFileName;
-    for (int i = 0; i < 120; i++) // populate the directory
+    for (int i = 0; i < 120; i++) // populate the directory (passed tests)
     {
         sprintf(myFileName, "%d", i);
         res_create_file = sfs_create(myFileName);
@@ -59,7 +59,7 @@ void timing_experiments(){
     }
 
     printf("index of the last opened file: %d. \n", lastFileName);
-    printf("test: sfs_open\n");
+    printf("test: sfs_open\n"); //passed tests
     int *fileDescriptors = malloc((lastFileName + 1) * sizeof(int));
     int lastOpenFileIndex;
     for (int i = 0; i <= lastFileName; i++)
@@ -75,7 +75,47 @@ void timing_experiments(){
     }
 
     printf("test: sfs_append\n");
+    int a = 1;
+    int *num = malloc(sizeof(a));
+    *num = 1;
+    int firstFileName = 0;
+    gettimeofday(&start, NULL);
+    int res_file_size = sfs_getsize(fileDescriptors[firstFileName]);
+    printf("test: file size %d\n", res_file_size);
+    counter = 0;
+    //TODO(zcankara) implement the sfs_append
+    while (counter < 1)
+    { // perform repeated write operation to a single file
+        int res = sfs_append(fileDescriptors[firstFileName], num, sizeof(int));
+        if (res < 0)
+        {
+            break;
+        }
+        counter++;
+    }
+    gettimeofday(&end, NULL);
 
+    printf("** consecutive write operations ***\n");
+    printf("\tSeconds (s): %ld\n", end.tv_sec - start.tv_sec);
+    printf("\tMicroseconds (ms): %ld\n",
+           (end.tv_sec * 1000000 + end.tv_usec) -
+               (start.tv_sec * 1000000 + start.tv_usec));
+    printf("test: sfs_append\n");
+    int res_close = sfs_close(fileDescriptors[firstFileName]);
+    if (res_close < 0)
+    {
+        printf("ERROR: Can't close the opened file!\n");
+        return;
+    }
+
+    printf("Try reopening the same file (REOPEN_MODE) after closing it!\n");
+    sprintf(myFileName, "%d", firstFileName);
+    fileDescriptors[firstFileName] = sfs_open(myFileName, MODE_READ);
+    if (fileDescriptors[firstFileName] < 0)
+    {
+        printf("ERROR: Can't reopened the file that is closed!\n");
+        return;
+    }
 }
 
 

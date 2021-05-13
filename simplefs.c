@@ -37,7 +37,7 @@
 #define INDEXING_BLOCK_PTR_COUNT 1024 // (4KB  (BLOCKSIZE)  / 4 Bytes (DISK_PTR_SIZE))
 #define MAX_NOF_FILES 128 // same as (DIR_ENTRY_COUNT)
 #define MAX_FILENAME_LENGTH 110 // characters
-#define MAX_NOF_OPEN_FILES 32 // same as DIR_ENTRY_PER_BLOCK
+#define MAX_NOF_OPEN_FILES 16  
 #define MAX_FILE_SIZE 4194304 // 4MB = 4KB (BLOCKSIZE) * (4KB / 4 Bytes)(INDEXING_BLOCK_PTR_COUNT)
 #define NOT_USED_FLAG 0
 #define USED_FLAG 1
@@ -331,12 +331,33 @@ int sfs_open(char *file, int mode)
 }
 
 int sfs_close(int fd){
+    if (is_file_opened(fd) == -1)
+    {
+        printf("ERROR: File not opened yet\n");
+        return -1;
+    }
+    // write the open file table data to the superblock/directory entry
+    set_directory_entry(fd);
+    set_superblock();
+    // clear the open file table related to the directory
+    open_file_table[fd].dirBlock = -1;
+    open_file_count--;
+
     return (0); 
 }
 
 int sfs_getsize (int  fd)
 {
-    return (0); 
+    if (is_file_opened(fd) == -1)
+    {
+        printf("ERROR: File not opened yet!\n");
+        return -1;
+    }
+    if(open_file_table[fd].directoryEntry.size < 0){
+        printf("ERROR: The file does not have a valid size!\n");
+        return -1;
+    }
+    return open_file_table[fd].directoryEntry.size; 
 }
 
 int sfs_read(int fd, void *buf, int n){
@@ -346,6 +367,49 @@ int sfs_read(int fd, void *buf, int n){
 
 int sfs_append(int fd, void *buf, int n)
 {
+    if (n <= 0)
+    {
+        printf("ERROR: n can't take a negative value! %d\n", n);
+        return -1;
+    }
+    // file must opened first
+    if (is_file_opened(fd) == -1)
+    {
+        printf("ERROR: file must opened first!\n");
+        return -1;
+    }
+    // file can't have a read mode
+    if (open_file_table[fd].openMode == MODE_READ)
+    {
+        printf("ERROR: can't append in READ mode!\n");
+        return -1;
+    }
+
+    int size = open_file_table[fd].directoryEntry.size;
+    int fcbIndex = open_file_table[fd].directoryEntry.fcbIndex;
+    printf("LOG(sfs_append): (filename: %s, fcb index: %d)\n", open_file_table[fd].directoryEntry.filename, fcbIndex);
+
+    int dataBlockOffset = size % BLOCKSIZE;
+    printf("LOG(sfs_append): (data_block_offset: %d)\n", dataBlockOffset);
+    if (dataBlockOffset == 0)
+    {
+        dataBlockOffset = BLOCKSIZE;
+    }
+    int remainingByte = BLOCKSIZE - dataBlockOffset; // for the last block
+    printf("LOG(sfs_append): (remaining_bytes: %d)\n", remainingByte);
+    int requiredBlockCount = (n - remainingByte - 1) / BLOCKSIZE + 1;
+    if (n <= remainingByte)
+    {
+        requiredBlockCount = 0;
+    }
+    printf("LOG(sfs_append): (required_block_count: %d)\n", requiredBlockCount);
+    if (requiredBlockCount > free_block_count)
+    {
+        printf("ERROR: Not enough free blocks available!\n");
+        return -1;
+    } 
+
+
     return (0); 
 }
 
@@ -430,6 +494,40 @@ void clear_open_file_table()
     }
 }
 
+int is_file_opened(int fd)
+{
+    if (open_file_table[fd].dirBlock >= 0)
+    {
+        return 0; // opened
+    }
+    return -1; // not opened
+}
+
+// setters to write open file table to the disk //
+void set_superblock(){
+    char block[BLOCKSIZE];
+    read_block((void *)block, SUPERBLOCK_START);
+    ((int *)(block + 4))[0] = empty_FCB_count;        
+    ((int *)(block + 8))[0] = free_block_count;  
+    ((int *)(block + 12))[0] = file_count;     
+    write_block((void *)block, SUPERBLOCK_START);
+};
+
+void set_directory_entry(int fd){
+    char block[BLOCKSIZE];
+    // get the directory entry location responsible of the file
+    read_block((void *)block, open_file_table[fd].dirBlock + ROOT_DIR_START);
+    int startByte = open_file_table[fd].dirBlockOffset * DIR_ENTRY_SIZE;
+    ((int *)(block + startByte + MAX_FILENAME_LENGTH))[0] = open_file_table[fd].directoryEntry.size;
+    ((int *)(block + startByte + (MAX_FILENAME_LENGTH + 4)))[0] = open_file_table[fd].directoryEntry.fcbIndex;
+    ((char *)(block + startByte + (MAX_FILENAME_LENGTH + 8)))[0] = USED_FLAG;
+    write_block((void *)block, open_file_table[fd].dirBlock + ROOT_DIR_START);
+    printf("LOG(set_directory_entry) the data written to the disk for fd: %d\n", fd);
+    printf("\tLOG(set_directory_entry): (size: %d) \n", open_file_table[fd].directoryEntry.size);
+    printf("\tLOG(set_directory_entry): (fcbIndex: %d) \n",  open_file_table[fd].directoryEntry.fcbIndex);
+};
+
+
 // getters to access disk blocks
 void get_superblock(){
     char block[BLOCKSIZE];
@@ -438,10 +536,11 @@ void get_superblock(){
     empty_FCB_count = ((int *)(block + 4))[0];
     free_block_count = ((int *)(block + 8))[0];
     file_count = ((int *)(block + 12))[0];
-    printf("LOG(get_superblock): (data_count: %d) \n", data_count);
-    printf("LOG(get_superblock): (empty FCB: %d) \n",  empty_FCB_count);
-    printf("LOG(get_superblock): (free block count: %d) \n", free_block_count);
-    printf("LOG(get_superblock): (file count: %d) \n", file_count);
+    printf("LOG(get_superblock)\n");
+    printf("\tLOG(get_superblock): (data_count: %d) \n", data_count);
+    printf("\tLOG(get_superblock): (empty FCB: %d) \n",  empty_FCB_count);
+    printf("\tLOG(get_superblock): (free block count: %d) \n", free_block_count);
+    printf("\tLOG(get_superblock): (file count: %d) \n", file_count);
 }
 
 void get_bitmap(){
