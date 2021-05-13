@@ -36,6 +36,8 @@ void init_FCB(int data_count);
 
 void init_root_directory();
 
+void clear_open_file_table();
+
 
 // getters //
 void get_superblock();

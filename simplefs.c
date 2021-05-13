@@ -38,6 +38,28 @@
 #define MAX_FILE_SIZE 4194304 // 4MB = 4KB (BLOCKSIZE) * (4KB / 4 Bytes)(INDEXING_BLOCK_PTR_COUNT)
 // Offsets for iterating in the filesystem structure
 
+// structures
+struct DirEntry
+{
+    char filename[MAX_FILENAME_LENGTH];
+    int fcbIndex;
+};
+
+struct FCBEntry
+{
+    int isUsed;
+    int indexBlockPtr;
+    int fileSize;
+};
+
+struct File
+{
+    struct DirEntry directoryEntry;
+    int openMode;
+    int dirBlock;
+    int dirBlockOffset;
+    int readPointer;
+};
 
 
 // Global Variables =======================================
@@ -51,6 +73,9 @@ int data_count;
 int empty_FCB_count;
 int free_block_count;
 int file_count;
+
+int open_file_count = 0;
+struct File open_file_table[MAX_NOF_FILES]; //contains file index or -1
 
 
 // read block k from disk (virtual disk) into buffer block.
@@ -137,6 +162,8 @@ int sfs_mount (char *vdiskname)
     // way make it ready to be used for other operations.
     // vdisk_fd is global; hence other function can use it. 
     vdisk_fd = open(vdiskname, O_RDWR); 
+    get_superblock();
+    clear_open_file_table();  
     return(0);
 }
 
@@ -251,6 +278,16 @@ void init_root_directory()
     }
 }
 
+
+
+void clear_open_file_table()
+{
+    for (int i = 0; i < MAX_NOF_FILES; i++)
+    {
+        open_file_table[i].dirBlock = -1;
+        open_file_count = 0;
+    }
+}
 
 // getters to access disk blocks
 void get_superblock(){

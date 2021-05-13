@@ -23,6 +23,7 @@ void timing_experiments(){
     gettimeofday(&start, NULL);
     int counter = 0;
     char *vfs_name = "vfs";
+    // crate the simple file system
     res_create = create_format_vdisk(vfs_name, 20); //NOTE: Max disk size 128 MB
     is_res_pass(res_create, counter);
     gettimeofday(&end, NULL);
@@ -33,7 +34,12 @@ void timing_experiments(){
            (end.tv_sec * 1000000 + end.tv_usec) -
                (start.tv_sec * 1000000 + start.tv_usec));
     
-    get_superblock();
+    // mount the simple file system
+    counter++;
+    int mountRes = sfs_mount(vfs_name);
+    is_res_pass(mountRes, counter);
+
+    
 }
 
 
