@@ -43,7 +43,20 @@ void timing_experiments(){
     counter++;
     int res_create_file = sfs_create("vfs.txt");
     is_res_pass(res_create_file, counter);
-    
+    // create consecutive files
+    int *myFileDescriptors = malloc(1000000 * sizeof(int));
+    char myFileName[1000000];
+    int lastFileName;
+    for (int i = 0; i < 127; i++) // populate the directory
+    {
+        sprintf(myFileName, "%d", i);
+        res_create_file = sfs_create(myFileName);
+        if (res_create_file < 0)
+        {
+            break;
+        }
+        lastFileName = i;
+    }
 }
 
 

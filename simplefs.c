@@ -226,7 +226,7 @@ int sfs_create(char *filename)
             {
                 dirBlock = i;
                 dirBlockOffset = j;
-                printf("LOG(sfs_create): Empty dir entry is found %d, %d!\n", i, j);
+                printf("LOG(sfs_create): Empty directory entry is found (block: %d, offset: %d)!\n", i, j);
                 found = true;
                 break;
             }
