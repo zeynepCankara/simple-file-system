@@ -28,6 +28,8 @@
 #define DIR_ENTRY_COUNT 128 // 4(ROOT_DIR_COUNT) * 32 (DIR_ENTRY_PER_BLOCK)
 #define FCB_SIZE 128 // Bytes
 #define FCB_PER_BLOCK 32 // 4KB (BLOCKSIZE)/128 Bytes (FCB_SIZE)
+#define BITMAP_BIT_PER_BLOCK 4096 // 4KB
+#define BITMAP_BIT_SIZE 1 // bit
 #define DISK_PTR_SIZE 4 // Bytes (32 bits)
 #define BLOCK_NO_SIZE 4 // Bytes (32 bits)
 #define INDEXING_BLOCK_PTR_COUNT 1024 // (4KB  (BLOCKSIZE)  / 4 Bytes (DISK_PTR_SIZE))
@@ -113,8 +115,8 @@ int create_format_vdisk (char *vdiskname, unsigned int m)
     vdisk_fd = open(vdiskname, O_RDWR);
     int data_count = count - header_count;
     init_superblock(data_count);
-    //init_bitmap();
-    //init_FCB(data_count);
+    init_bitmap();
+    init_FCB(data_count);
     init_root_directory();
     fsync(vdisk_fd); // copy everything in memory to disk
     close(vdisk_fd);
@@ -192,17 +194,52 @@ void init_superblock(int data_count){
     write_block((void *)ablock, SUPERBLOCK_START);
 }
 
+void init_bitmap(){
+    // 1) iterate over bitmap blocks
+    // 2) iterate over each bitmap bit 
+    // 3) initialise the used bit to the 0 (to indicate free)
+    // NOTE: each bit in bitmap shows whether a block allocated or not
+    char block[BLOCKSIZE];
+    for (int i = 0; i < BITMAP_COUNT; i++)
+    {
+        for (int j = 0; j < BITMAP_BIT_PER_BLOCK; j++)
+        {
+            ((int *)(block + j * BITMAP_BIT_SIZE))[0] = 0;
+        }
+        write_block((void *)block, BITMAP_START + i);
+    }
+}
+
+
+void init_FCB(int data_count)
+{
+    // 1) iterate over fcb blocks
+    // 2) iterate over each fcb entry
+    // 3) initialise the used bit to the 0
+    char block[BLOCKSIZE];
+    for (int i = 0; i < FCB_COUNT; i++)
+    {
+        for (int j = 0; j < FCB_PER_BLOCK; j++)
+        {
+            ((int *)(block + j * FCB_SIZE))[0] = 0;
+        }
+        write_block((void *)block, FCB_START + i);
+    }
+}
+
 
 void init_root_directory()
 {
     char block[BLOCKSIZE];
+    // TODO(zcankara) decide necessary or not
     int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
-    int notUsedFlag = 48;
+    int notUsedFlag = 0;
     for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
     {
         int startByte = j * DIR_ENTRY_SIZE;
         ((char *)(block + startByte + offsetFromStart))[0] = notUsedFlag;
     }
+    // write to the disk
     for (int i = 0; i < ROOT_DIR_COUNT; i++)
     {
         write_block((void *)block, ROOT_DIR_START + i);

@@ -30,4 +30,8 @@ int sfs_delete(char *filename);
 
 void init_superblock(int data_count);
 
+void init_bitmap();
+
+void init_FCB(int data_count);
+
 void init_root_directory();
