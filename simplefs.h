@@ -61,3 +61,7 @@ void get_bitmap();
 void get_root_dir_entry();
 
 void get_fcb();
+
+int get_index_block(int block_no, int block_offset);
+
+int get_available_index_block_offset(int index_block);
