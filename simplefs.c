@@ -65,8 +65,6 @@ struct File
     int dirBlock;
     int dirBlockOffset;
     int readPointer;
-    int writeBlock; // where the block write ends
-    int writeBlockOffset; //  where the offset for the write block
 };
 
 
@@ -336,8 +334,6 @@ int sfs_open(char *file, int mode)
                 open_file_table[fd].dirBlockOffset = j;
                 open_file_table[fd].openMode = mode;
                 open_file_table[fd].readPointer = 0;
-                open_file_table[fd].writeBlock =  -1;
-                open_file_table[fd].writeBlockOffset =  -1;
                 memcpy(open_file_table[fd].directoryEntry.filename, filename, MAX_FILENAME_LENGTH);
                 open_file_table[fd].directoryEntry.size = ((int *)(block + startByte + MAX_FILENAME_LENGTH))[0];
                 open_file_table[fd].directoryEntry.fcbIndex = ((int *)(block + startByte + (MAX_FILENAME_LENGTH+4)))[0];
@@ -473,6 +469,7 @@ int sfs_append(int fd, void *buf, int n)
     printf("LOG(sfs_append): (filename: %s, fcb index: %d)\n", open_file_table[fd].directoryEntry.filename, fcbIndex);
 
     int dataBlockOffset = size % BLOCKSIZE;
+    int dataBlockNo = size / BLOCKSIZE;
     printf("LOG(sfs_append): (data_block_offset: %d)\n", dataBlockOffset);
     if (dataBlockOffset == 0)
     {
@@ -492,125 +489,93 @@ int sfs_append(int fd, void *buf, int n)
         return -1;
     } 
 
-    //char block[BLOCKSIZE];
     int index_block = get_index_block(open_file_table[fd].dirBlock, open_file_table[fd].dirBlockOffset);
     int byteCount = 0;
-    printf("LOG(sfs_append): (index block for the file: %d)\n", index_block);
     if(size == 0){
-        // nothing written to the file yet
-        // open the block to write
+        // no data exists
+        for (int i = 0; i < requiredBlockCount; i++)
+        {
+            //initialise the block
+            char block[BLOCKSIZE];
+            int index_block_offset = get_next_available_index_block(index_block);
+            ((int *)(block + i * DISK_PTR_SIZE))[0] = index_block_offset; 
+            write_block((void *)block, index_block);
+            // access to the index block
+            char block_data[BLOCKSIZE];
+            for (int i = 0; i < BLOCKSIZE; i++)
+            {
+                ((char *)(block_data + i))[0] = ((char *)(buf + byteCount))[0];
+                byteCount++;
+                if (byteCount == n)
+                {
+                    open_file_table[fd].directoryEntry.size = size + n;
+                    free_block_count -= requiredBlockCount;
+                    write_block((void *)block_data, index_block_offset);
+                    // terminate the program
+                    printf("LOG(sfs_append)\n");
+                    printf("\tLOG(sfs_append): (byte count: %d, n: %d )\n", byteCount, n);
+                    return byteCount;
+                }
+            }
+        }
+    } else {
+        // already data exists
+        int index_block_offset = 0;
         char block[BLOCKSIZE];
         read_block((void *)block, index_block);
-        // initialise the blocks for writing
-        int available_file_block;
-        for (int j = 0; j < requiredBlockCount; j++)
+        int current_block_no = ((int *)(block + dataBlockNo * DISK_PTR_SIZE))[0];
+        int current_block_offset = dataBlockOffset;
+        char block_data[BLOCKSIZE];
+        if (current_block_no  < 0)
         {
-            available_file_block = get_next_available_block();  
-            ((int *)(block + j * DISK_PTR_SIZE))[0] = available_file_block;  
-            // put data to the available block
-            for (int j = 0; j < BLOCKSIZE; j++)
-            {
-                ((char *)(block + j))[0] = -1; 
-                
-            }
-            int j = 0;
-            while(byteCount < n && byteCount < BLOCKSIZE){
-                ((char *)(block + j))[0] = ((char *)(buf + byteCount))[0];
-                byteCount++;
-                j++;
-            }
-            if (write_block((void *)block, available_file_block) == -1)
-            {
-                printf("ERROR: Can't write to the data block!\n");
-                return -1;
-            }
-            if(byteCount == n){
-                open_file_table[fd].writeBlockOffset = j;
-                break;
-            }
-        }
-        write_block((void *)block, index_block);
-        open_file_table[fd].writeBlock = available_file_block; // left at the available file block
-        if(byteCount != n){
-            open_file_table[fd].writeBlockOffset = 0;
-        }
-
-
-    } else {
-        // already exists data
-        // finds the last available index block offset
-        char block[BLOCKSIZE];
-        int write_block_no = open_file_table[fd].writeBlock;
-        int write_block_offset = open_file_table[fd].writeBlockOffset;
-        // read the curent block in memory
-        read_block((void *)block, write_block_no);
-        for (int i = write_block_offset; i < BLOCKSIZE; i++)
-        {
-            ((char *)(block + i))[0] = ((char *)(buf + byteCount))[0];
-            // writing done
-            if(byteCount == n){
-                open_file_table[fd].writeBlockOffset = i;
-                open_file_table[fd].writeBlock = write_block_no;
-                write_block((void *)block, write_block_no);
-                //TODO(zcankara) return the result
-                printf("LOG(sfs_append)\n");
-                printf("\tLOG(sfs_append): (byte count: %d, n: %d )\n", byteCount, n);
-                printf("\tLOG(sfs_append): (write end block: %d, write offset ptr: %d )\n", open_file_table[fd].writeBlock, open_file_table[fd].writeBlockOffset);
-                // increment the size of the file
-                open_file_table[fd].directoryEntry.size = size + n;
-                free_block_count -= requiredBlockCount;
-                return byteCount;
-            }
-            byteCount++;
-        }
-        write_block((void *)block, write_block_no);
-        // get the next available block to write to
-        int disk_ptr_offset = get_available_index_block_offset(index_block);
-        if(disk_ptr_offset == -1){
-            printf("ERROR: index block offset is out bounds!\n");
             return -1;
         }
-
-        read_block((void *)block, index_block);
-        // initialise the blocks for writing
-        int available_file_block;
-        for (int j = 0; j < requiredBlockCount; j++)
+        write_block((void *)block_data, current_block_no);
+        for (int i = current_block_offset; i < BLOCKSIZE; i++)
         {
-            available_file_block = get_next_available_block();  
-            ((int *)(block + (j+disk_ptr_offset) * DISK_PTR_SIZE))[0] = available_file_block;  
-            // put data to the available block
-            for (int j = 0; j < BLOCKSIZE; j++)
+            ((char *)(block_data + i))[0] = ((char *)(buf + byteCount))[0];
+            byteCount++;
+            if (byteCount == n)
             {
-                ((char *)(block + j))[0] = -1; 
-                
+                open_file_table[fd].directoryEntry.size = size + n;
+                free_block_count -= requiredBlockCount;
+                write_block((void *)block_data, current_block_no);
+                // terminate the program
+                printf("LOG(sfs_append)\n");
+                printf("\tLOG(sfs_append): (byte count: %d, n: %d )\n", byteCount, n);
+                return byteCount;
             }
-            int j = 0;
-            while(byteCount < n && byteCount < BLOCKSIZE){
-                ((char *)(block + j))[0] = ((char *)(buf + byteCount))[0];
+        }
+        // if search still continues then get the next available index
+        for (int i = 0; i < requiredBlockCount; i++)
+        {
+            //initialise the block
+            char block[BLOCKSIZE];
+            int index_block_offset = get_next_available_index_block(index_block);
+            ((int *)(block + i * DISK_PTR_SIZE))[0] = index_block_offset; 
+            write_block((void *)block, index_block);
+            // access to the index block
+            char block_data[BLOCKSIZE];
+            for (int i = 0; i < BLOCKSIZE; i++)
+            {
+                ((char *)(block_data + i))[0] = ((char *)(buf + byteCount))[0];
                 byteCount++;
-                j++;
-            }
-            if (write_block((void *)block, available_file_block) == -1)
-            {
-                printf("ERROR: Can't write to the data block!\n");
-                return -1;
-            }
-            if(byteCount == n){
-                open_file_table[fd].writeBlockOffset = j;
-                break;
+                if (byteCount == n)
+                {
+                    open_file_table[fd].directoryEntry.size = size + n;
+                    free_block_count -= requiredBlockCount;
+                    write_block((void *)block_data, index_block_offset);
+                    // terminate the program
+                    printf("LOG(sfs_append)\n");
+                    printf("\tLOG(sfs_append): (byte count: %d, n: %d )\n", byteCount, n);
+                    return byteCount;
+                }
             }
         }
-        write_block((void *)block, index_block);
-        open_file_table[fd].writeBlock = available_file_block; // left at the available file block
-        if(byteCount != n){
-            open_file_table[fd].writeBlockOffset = 0;
-        }
-
     }
     // check whether the data written properly
     printf("LOG(sfs_append)\n");
     printf("\tLOG(sfs_append): (byte count: %d, n: %d )\n", byteCount, n);
-    printf("\tLOG(sfs_append): (write end block: %d, write offset ptr: %d )\n", open_file_table[fd].writeBlock, open_file_table[fd].writeBlockOffset);
     // increment the size of the file
     open_file_table[fd].directoryEntry.size = size + n;
     free_block_count -= requiredBlockCount;

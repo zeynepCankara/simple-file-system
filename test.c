@@ -291,7 +291,8 @@ int main(int argc, char **argv)
     sfs_create ("file3.bin");
     */
     // test_size();
-    timing_experiments();
+    //timing_experiments();
+    timing_experiments2();
 
     return (0);
 
