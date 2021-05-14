@@ -169,6 +169,11 @@ int sfs_mount (char *vdiskname)
     // vdisk_fd is global; hence other function can use it. 
     vdisk_fd = open(vdiskname, O_RDWR); 
     get_superblock();
+    for (int i = 0; i < 13; i++)
+    {
+        // mark the first 13 bitmap block unavailable
+        get_next_available_block();
+    }
     clear_open_file_table();  
     return(0);
 }
@@ -514,7 +519,7 @@ void init_bitmap(){
     {
         for (int j = 0; j < BITMAP_BIT_PER_BLOCK; j++)
         {
-            ((int *)(block + j * BITMAP_BIT_SIZE))[0] = 0;
+            ((int *)(block + j * BITMAP_BIT_SIZE))[0] = NOT_USED_FLAG;
         }
         write_block((void *)block, BITMAP_START + i);
     }
@@ -531,7 +536,7 @@ void init_FCB(int data_count)
     {
         for (int j = 0; j < FCB_PER_BLOCK; j++)
         {
-            ((int *)(block + j * FCB_SIZE))[0] = 0;
+            ((int *)(block + j * FCB_SIZE))[0] = NOT_USED_FLAG;
         }
         write_block((void *)block, FCB_START + i);
     }
@@ -597,6 +602,37 @@ void set_directory_entry(int fd){
     printf("LOG(set_directory_entry) the data written to the disk for fd: %d\n", fd);
     printf("\tLOG(set_directory_entry): (size: %d) \n", open_file_table[fd].directoryEntry.size);
     printf("\tLOG(set_directory_entry): (fcbIndex: %d) \n",  open_file_table[fd].directoryEntry.fcbIndex);
+};
+
+// use to write to the bitmap to mark block availability
+void set_bitmap_entry(int block_no, int bit){
+    char block[BLOCKSIZE];
+    read_block((void *)block, BITMAP_START);
+    int startByte = block_no;
+    ((int *)(block + startByte))[0] = bit;
+    printf("LOG(set_bitmap_entry) (block no: %d, bit: %d)\n", block_no, bit);
+};
+
+// use bitmap to find the next available block for allocation
+int get_next_available_block(){
+    char block[BLOCKSIZE];
+    read_block((void *)block, BITMAP_START);
+    int block_no = 0;
+    for (int i = 0; i < BITMAP_COUNT; i++)
+    {
+        for (int j = 0; j < BITMAP_BIT_PER_BLOCK; j++)
+        {
+            int is_used = ((int *)(block + j * BITMAP_BIT_SIZE))[0];
+            if(is_used == NOT_USED_FLAG){
+                ((int *)(block + j * BITMAP_BIT_SIZE))[0] = USED_FLAG; // mark as used
+                write_block((void *)block, BITMAP_START + i); // write the data to the disk
+                printf("LOG(get_next_available_block) (block no: %d)\n", block_no);
+                return block_no;
+            }
+            block_no++;
+        }
+    }
+    return -1; // no block available
 };
 
 

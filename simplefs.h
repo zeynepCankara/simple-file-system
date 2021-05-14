@@ -45,6 +45,10 @@ void set_superblock();
 
 void set_directory_entry(int fd);
 
+void set_bitmap_entry(int block_no, int bit);
+
+int get_next_available_block();
+
 // getters //
 void get_superblock();
 
