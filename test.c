@@ -74,48 +74,71 @@ void timing_experiments(){
         lastOpenFileIndex = i;
     }
 
-    printf("test: sfs_append\n");
     int a = 1;
     int *num = malloc(sizeof(a));
     *num = 1;
     int firstFileName = 0;
     gettimeofday(&start, NULL);
-    int res_file_size = sfs_getsize(fileDescriptors[firstFileName]);
-    printf("test: file size %d\n", res_file_size);
     counter = 0;
-    //TODO(zcankara) implement the sfs_append
-    while (counter < 1)
-    { // perform repeated write operation to a single file
+    while (1)
+    { // repeated write on a single file
         int res = sfs_append(fileDescriptors[firstFileName], num, sizeof(int));
         if (res < 0)
         {
             break;
         }
-        counter++;
     }
     gettimeofday(&end, NULL);
 
-    printf("** consecutive write operations ***\n");
-    printf("\tSeconds (s): %ld\n", end.tv_sec - start.tv_sec);
-    printf("\tMicroseconds (ms): %ld\n",
+    printf("Writing to a file time:\n");
+    printf("\tIn seconds: %ld\n", end.tv_sec - start.tv_sec);
+    printf("\tIn microseconds: %ld\n",
            (end.tv_sec * 1000000 + end.tv_usec) -
                (start.tv_sec * 1000000 + start.tv_usec));
-    printf("test: sfs_append\n");
-    int res_close = sfs_close(fileDescriptors[firstFileName]);
-    if (res_close < 0)
+
+    
+    printf("sfs_close\n");
+    int res = sfs_close(fileDescriptors[firstFileName]);
+    if (res < 0)
     {
-        printf("ERROR: Can't close the opened file!\n");
         return;
     }
 
-    printf("Try reopening the same file (REOPEN_MODE) after closing it!\n");
+    printf("reopening the same file\n");
     sprintf(myFileName, "%d", firstFileName);
-    fileDescriptors[firstFileName] = sfs_open(myFileName, MODE_READ);
+    fileDescriptors[firstFileName] = vsfs_open(myFileName, MODE_READ);
     if (fileDescriptors[firstFileName] < 0)
     {
-        printf("ERROR: Can't reopened the file that is closed!\n");
         return;
     }
+    int curNum;
+    int sum = 0;
+    void *ptr = malloc(sizeof(int));
+    gettimeofday(&start, NULL);
+    while (1)
+    { // perform repeated read operations
+        res = sfs_read(fileDescriptors[firstFileName], ptr, sizeof(int));
+        if (res < 0)
+        {
+            break;
+        }
+        sum = sum + (*(int *)ptr);
+    }
+    gettimeofday(&end, NULL);
+
+    printf("Reading from a file time:\n");
+    printf("\tIn seconds: %ld\n", end.tv_sec - start.tv_sec);
+    printf("\tIn microseconds: %ld\n",
+           (end.tv_sec * 1000000 + end.tv_usec) -
+               (start.tv_sec * 1000000 + start.tv_usec));
+
+    sfs_close(fileDescriptors[firstFileName]);
+    sprintf(myFileName, "%d", firstFileName);
+    //vsfs_delete(myFileName); //TODO(zcankara) implement the delete
+    //sprintf(myFileName, "%d", firstFileName);
+    //vsfs_create(myFileName);
+    //fileDescriptors[firstFileName] = vsfs_open(myFileName, MODE_APPEND);
+
 
     printf("test: sfs_umount\n");
     int res_umount = sfs_umount();
@@ -260,39 +283,9 @@ void test_size(){
 int main(int argc, char **argv)
 {
 
-    /*
 
-    int ret;
-    int fd1, fd2, fd; 
-    int i;
-    char c; 
-    char buffer[1024];
-    char buffer2[8] = {50, 50, 50, 50, 50, 50, 50, 50};
-    int size;
-    char vdiskname[200]; 
-
-    printf ("started\n");
-
-    if (argc != 2) {
-        printf ("usage: app  <vdiskname>\n");
-        exit(0);
-    }
-    strcpy (vdiskname, argv[1]); 
-    
-    ret = sfs_mount (vdiskname);
-    if (ret != 0) {
-        printf ("could not mount \n");
-        exit (1);
-    }
-
-    printf ("creating files\n"); 
-    sfs_create ("file1.bin");
-    sfs_create ("file2.bin");
-    sfs_create ("file3.bin");
-    */
-    // test_size();
-    //timing_experiments();
-    timing_experiments2();
+    timing_experiments();
+    //timing_experiments2();
 
     return (0);
 

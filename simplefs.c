@@ -408,36 +408,59 @@ int sfs_read(int fd, void *buf, int n){
     int end_block_count = end_read_ptr_file  / BLOCKSIZE;
     int end_block_offset = end_read_ptr_file  % BLOCKSIZE;
     printf("LOG(sfs_read)\n");
-    printf("\tLOG(set_directory_entry): (start_block_count: %d, start_block_offset: %d ) \n", start_block_count, start_block_offset);
-    printf("\tLOG(set_directory_entry): (end_block_count: %d, end_block_offset: %d ) \n",  end_block_count, end_block_offset);
+    printf("\tLOG(sfs_read): (start_block_count: %d, start_block_offset: %d ) \n", start_block_count, start_block_offset);
+    printf("\tLOG(sfs_read): (end_block_count: %d, end_block_offset: %d ) \n",  end_block_count, end_block_offset);
 
-    void *buf_ptr = buf;
+ 
+    int index_block = get_index_block(open_file_table[fd].dirBlock, open_file_table[fd].dirBlockOffset);
+    int byteCount = 0;
+    void *bufPtr = buf;
+    printf("\tLOG(sfs_read): START(bufBtr %d ) \n", byteCount);
+    // iterate until n bytes are read
     char block[BLOCKSIZE];
-    // access the data from indexed allocation scheme
-    int fcb_entry_idx = 0;
-    int index_block_ptr;
-    bool found = false;
-    // access the index block address
-    for (int i = 0; i < FCB_COUNT; i++)
+    read_block((void *)block, index_block);   
+    for (int i = start_block_count; i < end_block_count; i++)
     {
-        for (int j = 0; j < FCB_PER_BLOCK; j++)
-        {
-            ((int *)(block + j * FCB_SIZE))[0] = 0;
-            if(fcb_entry_idx  == fcb_index_file){
-                index_block_ptr = ((int *)(block + j * FCB_SIZE + 4))[0];
-                found = true;
-                break;
-            }
-            fcb_entry_idx++;
+        int current_block_no = ((int *)(block + i * DISK_PTR_SIZE))[0];
+        if(current_block_no == -1){
+            printf("BRRRRRRRRRRRR");
+            return -1;
         }
-        if(found){
-            break;
+        // access the block
+        if(i == start_block_count){
+            // take account the start offset
+            char block_data[BLOCKSIZE];
+            read_block((void *)block_data, current_block_no);
+            for (int i = start_block_count; i < BLOCKSIZE; i++)
+            {
+                ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
+                bufPtr += 1;
+                byteCount++;
+            }
+        }
+        else if(i == end_block_count){
+            // take account the end offset
+            char block_data[BLOCKSIZE];
+            read_block((void *)block_data, current_block_no);
+            for (int i = 0; i < end_block_offset; i++)
+            {
+                ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
+                bufPtr += 1;
+                byteCount++;
+            }
+        } else {
+            // read the entire block
+            char block_data[BLOCKSIZE];
+            read_block((void *)block_data, current_block_no);
+            for (int i = 0; i < BLOCKSIZE; i++)
+            {
+                ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
+                bufPtr += 1;
+                byteCount++;
+            }
         }
     }
-    // note that index block is the block where the file allocated
-    printf("\tLOG(sfs_read): (index_block_ptr: %d ) \n",  index_block_ptr);
-
-
+    printf("\tLOG(sfs_read): END(byteCpınt %d ) \n", byteCount);
     // increment the file pointer
     open_file_table[fd].readPointer = end_read_ptr_file;
     return (0); 
