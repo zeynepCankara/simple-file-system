@@ -263,8 +263,10 @@ int sfs_create(char *filename)
     }
     memcpy(((char *)(block + startByte)), filename, MAX_FILENAME_LENGTH);
     ((int *)(block + startByte + MAX_FILENAME_LENGTH))[0] = 0;   // size of the file
-    ((int *)(block + startByte + (MAX_FILENAME_LENGTH + 4)))[0] = -1;  // index to the FCB
+    ((int *)(block + startByte + (MAX_FILENAME_LENGTH + 4)))[0] = file_count;  // index to the FCB (previously -1, made it file count)
     ((char *)(block + startByte + (MAX_FILENAME_LENGTH + 8)))[0] = USED_FLAG; // mark as used
+    // setup the index block for the file
+    init_fcb_entry(file_count, dirBlock, dirBlockOffset);
 
     int res = write_block((void *)block, dirBlock + ROOT_DIR_START);
     if (res == -1)
@@ -604,6 +606,38 @@ void set_directory_entry(int fd){
     printf("\tLOG(set_directory_entry): (fcbIndex: %d) \n",  open_file_table[fd].directoryEntry.fcbIndex);
 };
 
+// sets the fcb entry
+void init_fcb_entry(int fcbIndex, int fcbBlock, int fcbOffset){
+    char block[BLOCKSIZE];
+    read_block((void *)block, fcbBlock + FCB_START);
+    int startByte = fcbOffset * FCB_SIZE;
+    ((int *)(block + startByte))[0] = USED_FLAG;
+    int index_block = get_next_available_index_block();
+    ((char *)(block + startByte + 4))[0] =  index_block; // initialise the content of index block with -1   
+    ((int *)(block + startByte + 8))[0] = 0; // size is 0 initially
+    write_block((void *)block, fcbBlock + FCB_START);
+    printf("LOG(init_fcb_entry)\n");
+    printf("\tLOG(init_fcb_entry): (fcbIndex: %d) \n", fcbIndex);
+    printf("\tLOG(init_fcb_entry): (index block: %d) \n",  index_block);
+};
+
+void set_fcb_entry(int fd){
+    char block[BLOCKSIZE];
+    read_block((void *)block, open_file_table[fd].dirBlock + FCB_START);
+    int startByte = open_file_table[fd].dirBlockOffset * FCB_SIZE;
+    ((int *)(block + startByte))[0] = USED_FLAG;
+    ((int *)(block + startByte + 4))[0] = open_file_table[fd].directoryEntry.fcbIndex;
+
+    int index_block = get_next_available_index_block();
+
+    ((char *)(block + startByte + 8))[0] =  index_block; // initialise the index block with -1
+    write_block((void *)block, open_file_table[fd].dirBlock + FCB_START);
+    printf("LOG(set_fcb_entry) the data written to the disk for fcb: %d\n", fd);
+    printf("\tLOG(set_fcb_entry): (size: %d) \n", open_file_table[fd].directoryEntry.size);
+    printf("\tLOG(set_fcb_entry): (fcbIndex: %d) \n",  open_file_table[fd].directoryEntry.fcbIndex);
+    printf("\tLOG(set_fcb_entry): (index block: %d) \n",  index_block);
+};
+
 // use to write to the bitmap to mark block availability
 void set_bitmap_entry(int block_no, int bit){
     char block[BLOCKSIZE];
@@ -633,6 +667,27 @@ int get_next_available_block(){
         }
     }
     return -1; // no block available
+};
+
+
+int get_next_available_index_block(){
+    char block[BLOCKSIZE];
+    int next_available_block = get_next_available_block();
+    if(next_available_block == -1){
+        printf("ERROR: No block available!");
+        return -1;
+    }
+    read_block((void *)block, next_available_block);
+    // 1) initialise the pointers of the index block
+    // 2) pointer slots will point to the block allocated
+    for (int j = 0; j < INDEXING_BLOCK_PTR_COUNT; j++)
+    {
+        //int available_file_block = get_next_available_block(); //TODO(zcankara) do in the allocation
+        ((int *)(block + j * DISK_PTR_SIZE))[0] = -1; // mark with -1 to indicate not allocated
+    }
+    write_block((void *)block, next_available_block);
+    printf("LOG(get_next_available_index_block) (index block no: %d)\n", next_available_block);
+    return next_available_block;
 };
 
 

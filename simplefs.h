@@ -49,6 +49,10 @@ void set_bitmap_entry(int block_no, int bit);
 
 int get_next_available_block();
 
+int get_next_available_index_block();
+
+void init_fcb_entry(int fcbIndex, int block, int offset);
+
 // getters //
 void get_superblock();
 
