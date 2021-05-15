@@ -117,7 +117,30 @@ void test_app(){
     {
         return;
     }
-    sfs_close(fileDescriptors[firstFileName]); // close the same file
+    int curNum;
+    int sum = 0;
+    void *ptr = malloc(sizeof(int));
+    gettimeofday(&start, NULL);
+    printf("** sfs_read ***\n");
+    while (1)
+    { // only repeated read on a single file
+        res = sfs_read(fileDescriptors[firstFileName], ptr, sizeof(int));
+        if (res < 0)
+        {
+            break;
+        }
+        sum = sum + (*(int *)ptr);
+    }
+    gettimeofday(&end, NULL);
+
+    printf("Reading from a file time:\n");
+    printf("\tIn seconds: %ld\n", end.tv_sec - start.tv_sec);
+    printf("\tIn microseconds: %ld\n",
+           (end.tv_sec * 1000000 + end.tv_usec) -
+               (start.tv_sec * 1000000 + start.tv_usec));
+
+    sfs_close(fileDescriptors[firstFileName]);
+
 
     printf("** sfs_umount ***\n");
     int res_umount = sfs_umount();

@@ -415,55 +415,72 @@ int sfs_read(int fd, void *buf, int n){
     int index_block = get_index_block(open_file_table[fd].dirBlock, open_file_table[fd].dirBlockOffset);
     int byteCount = 0;
     void *bufPtr = buf;
-    printf("\tLOG(sfs_read): START(bufBtr %d ) \n", byteCount);
+    printf("\tLOG(sfs_read): START(byteCount %d ) \n", byteCount);
     // iterate until n bytes are read
     char block[BLOCKSIZE];
-    read_block((void *)block, index_block);   
-    for (int i = start_block_count; i < end_block_count; i++)
+    read_block((void *)block, index_block); 
+
+    if (start_block_count == 0 && end_block_count == 0)
     {
-        int current_block_no = ((int *)(block + i * DISK_PTR_SIZE))[0];
-        if(current_block_no == -1){
-            printf("BRRRRRRRRRRRR");
-            return -1;
+        // data to be read fits to the single block
+        int index_block_ptr = fetch_next_index_block_ptr_from_offset(index_block, start_block_count);
+        char block_data[BLOCKSIZE];
+        read_block((void *)block_data, index_block_ptr);
+        for (int i = start_block_offset; i <  end_block_offset; i++)
+        {
+            ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
+            bufPtr += 1;
+            byteCount++;
         }
-        // access the block
-        if(i == start_block_count){
-            // take account the start offset
-            char block_data[BLOCKSIZE];
-            read_block((void *)block_data, current_block_no);
-            for (int i = start_block_count; i < BLOCKSIZE; i++)
-            {
-                ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
-                bufPtr += 1;
-                byteCount++;
+        
+    } else {
+        for (int i = start_block_count; i < end_block_count; i++){
+            int index_block_ptr = fetch_next_index_block_ptr_from_offset(index_block, start_block_count);
+            if(index_block_ptr == -1){
+                printf("BRRRRRRRRRRRR");
+                return -1;
             }
-        }
-        else if(i == end_block_count){
-            // take account the end offset
-            char block_data[BLOCKSIZE];
-            read_block((void *)block_data, current_block_no);
-            for (int i = 0; i < end_block_offset; i++)
-            {
-                ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
-                bufPtr += 1;
-                byteCount++;
+            // access the block
+            if(i == start_block_count){
+                // take account the start offset
+                char block_data[BLOCKSIZE];
+                read_block((void *)block_data, index_block_ptr);
+                for (int i = start_block_count; i < BLOCKSIZE; i++)
+                {
+                    ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
+                    bufPtr += 1;
+                    byteCount++;
+                }
             }
-        } else {
-            // read the entire block
-            char block_data[BLOCKSIZE];
-            read_block((void *)block_data, current_block_no);
-            for (int i = 0; i < BLOCKSIZE; i++)
-            {
-                ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
-                bufPtr += 1;
-                byteCount++;
+            else if(i == end_block_count){
+                // take account the end offset
+                char block_data[BLOCKSIZE];
+                read_block((void *)block_data, index_block_ptr);
+                for (int i = 0; i < end_block_offset; i++)
+                {
+                    ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
+                    bufPtr += 1;
+                    byteCount++;
+                }
+            } else {
+                // read the entire block
+                char block_data[BLOCKSIZE];
+                read_block((void *)block_data, index_block_ptr);
+                for (int i = 0; i < BLOCKSIZE; i++)
+                {
+                    ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
+                    bufPtr += 1;
+                    byteCount++;
+                }
             }
+           
         }
     }
-    printf("\tLOG(sfs_read): END(byteCpınt %d ) \n", byteCount);
+    
+    printf("\tLOG(sfs_read): END(byteCount %d ) \n", byteCount);
     // increment the file pointer
     open_file_table[fd].readPointer = end_read_ptr_file;
-    return (0); 
+    return byteCount; 
 }
 
 
@@ -784,6 +801,23 @@ int get_available_index_block_offset(int index_block){
     printf("LOG(get_available_index_block_offset) (index block no: %d, index block offser %d)\n", index_block, index_block_offset);
     return index_block_offset;
 }
+
+
+/*
+* Returns the file disk block at the specificed index block and offset
+*/
+int fetch_next_index_block_ptr_from_offset(int index_block, int index_block_offset){
+    char block[BLOCKSIZE];
+    read_block((void *)block, index_block);
+    int index_block_ptr = ((int *)(block + index_block_offset * DISK_PTR_SIZE))[0];
+    if (index_block_ptr == -1)
+    {
+        printf("LOG NOOO BLOCK ALLOCATED YET TO FETCH OFFSET");
+        return -1;
+    }
+    return index_block_ptr;
+}
+
 
 
 /*

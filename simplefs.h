@@ -57,6 +57,8 @@ int alloc_next_index_block_ptr(int index_block);
 
 int fetch_next_index_block_ptr(int index_block);
 
+int fetch_next_index_block_ptr_from_offset(int index_block, int index_block_offset);
+
 void init_fcb_entry(int fcbIndex, int block, int offset);
 
 // getters //
