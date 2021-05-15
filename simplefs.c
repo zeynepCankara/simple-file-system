@@ -696,6 +696,10 @@ int is_file_opened(int fd)
 }
 
 // setters to write open file table to the disk //
+
+/*
+** initialise the volume information
+*/
 void set_superblock(){
     char block[BLOCKSIZE];
     read_block((void *)block, SUPERBLOCK_START);
@@ -705,6 +709,9 @@ void set_superblock(){
     write_block((void *)block, SUPERBLOCK_START);
 };
 
+/*
+** For the file descriptor initialise the direcory entry
+*/
 void set_directory_entry(int fd){
     char block[BLOCKSIZE];
     // get the directory entry location responsible of the file
@@ -719,7 +726,9 @@ void set_directory_entry(int fd){
     printf("\tLOG(set_directory_entry): (fcbIndex: %d) \n",  open_file_table[fd].directoryEntry.fcbIndex);
 };
 
-// sets the fcb entry
+/*
+** For the specified directory entry sets up the index block
+*/
 void init_fcb_entry(int fcbIndex, int fcbBlock, int fcbOffset){
     char block[BLOCKSIZE];
     read_block((void *)block, fcbBlock + FCB_START);
@@ -734,24 +743,10 @@ void init_fcb_entry(int fcbIndex, int fcbBlock, int fcbOffset){
     printf("\tLOG(init_fcb_entry): (index block: %d) \n",  index_block);
 };
 
-void set_fcb_entry(int fd){
-    char block[BLOCKSIZE];
-    read_block((void *)block, open_file_table[fd].dirBlock + FCB_START);
-    int startByte = open_file_table[fd].dirBlockOffset * FCB_SIZE;
-    ((int *)(block + startByte))[0] = USED_FLAG;
-    ((int *)(block + startByte + 4))[0] = open_file_table[fd].directoryEntry.fcbIndex;
 
-    int index_block = get_next_available_index_block();
-
-    ((char *)(block + startByte + 8))[0] =  index_block; // initialise the index block with -1
-    write_block((void *)block, open_file_table[fd].dirBlock + FCB_START);
-    printf("LOG(set_fcb_entry) the data written to the disk for fcb: %d\n", fd);
-    printf("\tLOG(set_fcb_entry): (size: %d) \n", open_file_table[fd].directoryEntry.size);
-    printf("\tLOG(set_fcb_entry): (fcbIndex: %d) \n",  open_file_table[fd].directoryEntry.fcbIndex);
-    printf("\tLOG(set_fcb_entry): (index block: %d) \n",  index_block);
-};
-
-// use to write to the bitmap to mark block availability
+/*
+** For the specified block marks the availability on bitmap
+*/
 void set_bitmap_entry(int block_no, int bit){
     char block[BLOCKSIZE];
     read_block((void *)block, BITMAP_START);
@@ -760,7 +755,9 @@ void set_bitmap_entry(int block_no, int bit){
     printf("LOG(set_bitmap_entry) (block no: %d, bit: %d)\n", block_no, bit);
 };
 
-// use bitmap to find the next available block for allocation
+/*
+** from the bitmap finds and returns the next available block in the system
+*/
 int get_next_available_block(){
     char block[BLOCKSIZE];
     read_block((void *)block, BITMAP_START);
@@ -782,7 +779,13 @@ int get_next_available_block(){
     return -1; // no block available
 };
 
-
+/*
+** within the index block initialises the next available block
+*   finds the last not used disk pointer
+*   get the next available block from the system
+*   TODO(zcankara) create connection between pointer pointing to the block
+*   return the (block no) allocated within the system
+*/
 int get_next_available_index_block(){
     char block[BLOCKSIZE];
     int next_available_block = get_next_available_block();
@@ -803,35 +806,9 @@ int get_next_available_index_block(){
     return next_available_block;
 };
 
-
-// getters to access disk blocks
-void get_superblock(){
-    char block[BLOCKSIZE];
-    read_block((void *)block, SUPERBLOCK_START);
-    data_count = ((int *)(block))[0];
-    empty_FCB_count = ((int *)(block + 4))[0];
-    free_block_count = ((int *)(block + 8))[0];
-    file_count = ((int *)(block + 12))[0];
-    printf("LOG(get_superblock)\n");
-    printf("\tLOG(get_superblock): (data_count: %d) \n", data_count);
-    printf("\tLOG(get_superblock): (empty FCB: %d) \n",  empty_FCB_count);
-    printf("\tLOG(get_superblock): (free block count: %d) \n", free_block_count);
-    printf("\tLOG(get_superblock): (file count: %d) \n", file_count);
-}
-
-
-int get_index_block(int block_no, int block_offset){
-    char block[BLOCKSIZE];
-    read_block((void *)block, block_no + FCB_START);
-    int startByte = block_offset * FCB_SIZE;
-    int index_block =  ((char *)(block + startByte + 4))[0];
-    if(index_block == -1){
-        printf("ERROR: Block not initialised yet!");
-        return -1;
-    }
-    return index_block;
-}
-
+/*
+** within the index block finds the offset of the available position for allocation
+*/
 int get_available_index_block_offset(int index_block){
     char block[BLOCKSIZE];
     read_block((void *)block, index_block);
@@ -848,6 +825,42 @@ int get_available_index_block_offset(int index_block){
     printf("LOG(get_available_index_block_offset) (index block no: %d, index block offser %d)\n", index_block, index_block_offset);
     return index_block_offset;
 }
+
+
+
+/*
+** initialises the superblock information
+*  global variables
+*/
+void get_superblock(){
+    char block[BLOCKSIZE];
+    read_block((void *)block, SUPERBLOCK_START);
+    data_count = ((int *)(block))[0];
+    empty_FCB_count = ((int *)(block + 4))[0];
+    free_block_count = ((int *)(block + 8))[0];
+    file_count = ((int *)(block + 12))[0];
+    printf("LOG(get_superblock)\n");
+    printf("\tLOG(get_superblock): (data_count: %d) \n", data_count);
+    printf("\tLOG(get_superblock): (empty FCB: %d) \n",  empty_FCB_count);
+    printf("\tLOG(get_superblock): (free block count: %d) \n", free_block_count);
+    printf("\tLOG(get_superblock): (file count: %d) \n", file_count);
+}
+
+/*
+** from block number and block offset in root directory access the index block responsible of the file
+*/
+int get_index_block(int block_no, int block_offset){
+    char block[BLOCKSIZE];
+    read_block((void *)block, block_no + FCB_START);
+    int startByte = block_offset * FCB_SIZE;
+    int index_block =  ((char *)(block + startByte + 4))[0];
+    if(index_block == -1){
+        printf("ERROR: Block not initialised yet!");
+        return -1;
+    }
+    return index_block;
+}
+
 
 
 void get_bitmap(){
