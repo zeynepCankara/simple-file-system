@@ -438,7 +438,7 @@ int sfs_read(int fd, void *buf, int n){
         for (int i = start_block_count; i < end_block_count; i++){
             int index_block_ptr = fetch_next_index_block_ptr_from_offset(index_block, start_block_count);
             if(index_block_ptr == -1){
-                printf("BRRRRRRRRRRRR");
+                printf("ERROR(CRITICAL): can't fetch the block in range to read/ not allocated yet!\n");
                 return -1;
             }
             // access the block
@@ -577,12 +577,88 @@ int sfs_append(int fd, void *buf, int n)
             write_block((void *)block_data, index_block_ptr);
         }
     }
-    printf("LOG ERROR sys allocation");
+    printf("ERROR(CRITICAL): can't write the n bytes!\n");
     return -1;
 }
 
 int sfs_delete(char *filename)
 {
+    for (int i = 0; i < MAX_NOF_OPEN_FILES; i++)
+    {
+        if (open_file_table[i].dirBlock > -1 && strcmp(filename, open_file_table[i].directoryEntry.filename) == 0)
+        {
+            printf("LOG(sfs_delete) closing the file before deleting \n");
+            sfs_close(i);
+        }
+    }
+    // deallocate all previously allocated
+    int block_no_fcb = -1;
+    int block_offset_fcb = -1;
+    int index_block = -1;
+
+    // find the file with the filename within the system
+    char block[BLOCKSIZE];
+    int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
+    for (int i = 0; i < ROOT_DIR_COUNT; i++)
+    {
+        read_block((void *)block, ROOT_DIR_START + i);
+        for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
+        {
+            int startByte = j * DIR_ENTRY_SIZE;
+            char isUsed = ((char *)(block + startByte + offsetFromStart))[0];
+            char name[MAX_FILENAME_LENGTH];
+            memcpy(name, ((char *)(block + startByte)), MAX_FILENAME_LENGTH);
+            if (isUsed == USED_FLAG && strcmp(name, filename) == 0)
+            {
+                printf("LOG(sfs_delete): find the file in the system!\n");
+                ((char*)(block + startByte + offsetFromStart))[0] = NOT_USED_FLAG;
+                offsetFromStart -= 4;
+                block_no_fcb = i;
+                block_offset_fcb = j;
+                offsetFromStart -= 4;
+                ((char*)(block + startByte + offsetFromStart))[0] = 0; // size = 0
+                write_block((void *)block, ROOT_DIR_START + i);
+            }
+        }
+    }
+
+    if (block_no_fcb == -1)
+    {
+        printf("ERROR: Can't find any fcb associated with the file\n");
+        return -1;
+    }
+    
+    // find the fcb block to deallocate
+    char ablock[BLOCKSIZE];
+    read_block((void *)ablock, block_no_fcb + FCB_START);
+    int startByte = block_offset_fcb * FCB_SIZE;
+    ((int *)(ablock + startByte))[0] = NOT_USED_FLAG; // mark the fcb block as not used
+    index_block = ((char *)(ablock + startByte + 4))[0] ; // save the index block for further deallocation
+    ((int *)(ablock + startByte + 8))[0] = 0; // deallocate the size
+    write_block((void *)ablock, block_no_fcb + FCB_START);
+
+    //deallocate the index block
+    set_bitmap_entry(index_block, NOT_USED_FLAG);
+    char indexblock[BLOCKSIZE];
+    read_block((void *)indexblock, index_block);
+    int index_block_offset = -1;
+    for (int j = 0; j < INDEXING_BLOCK_PTR_COUNT; j++)
+    {
+        index_block_offset = ((int *)(indexblock + j * DISK_PTR_SIZE))[0];
+        if(index_block_offset != -1){
+            // allocated space found
+            printf("LOG(sfs_delete):  (index_block_offset: %d)\n", index_block_offset);
+            // mark the bit map not used  for deallocation
+            set_bitmap_entry(index_block_offset, NOT_USED_FLAG);
+            // set the block to where offset points 
+            ((int *)(indexblock + j * DISK_PTR_SIZE))[0] = -1; // mark as not allocated
+            write_block((void *)indexblock, index_block);
+            // populate the block position with -1
+            init_file_block(index_block_offset);
+        }
+    }
+
+    file_count--;
     return (0); 
 }
 
@@ -855,7 +931,7 @@ void init_file_block(int block_no){
     {
        ((int *)(block + i * BITMAP_BIT_SIZE))[0] = -1;
     }
-     write_block((void *)block, block_no);
+    write_block((void *)block, block_no);
 }
 
 /*

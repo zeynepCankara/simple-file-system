@@ -140,6 +140,13 @@ void test_app(){
                (start.tv_sec * 1000000 + start.tv_usec));
 
     sfs_close(fileDescriptors[firstFileName]);
+    sprintf(myFileName, "%d", firstFileName);
+    printf("*** sfs_delete ***\n");
+    sfs_delete(myFileName);
+    sprintf(myFileName, "%d", firstFileName);
+    sfs_create(myFileName);
+    fileDescriptors[firstFileName] = sfs_open(myFileName, MODE_APPEND);
+
 
 
     printf("** sfs_umount ***\n");
