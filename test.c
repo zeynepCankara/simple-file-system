@@ -147,7 +147,41 @@ void test_app(){
     sfs_create(myFileName);
     fileDescriptors[firstFileName] = sfs_open(myFileName, MODE_APPEND);
 
+    printf("*** sfs_append (speed test) ***\n");
+    int target = 10000;
+    *num = 0;
+    gettimeofday(&start, NULL);
+    for (int i = 0; i < target; i++) // fibonacci speed test, repetaed write and read on a single file
+    {
+        int addRes;
+        for (int j = 0; j <= lastOpenFileIndex; j++)
+        {
+            addRes = sfs_append(fileDescriptors[firstFileName + j], num, sizeof(int));
+            if (addRes < 0)
+            {
+                break;
+            }
+            if (*num > 10000)
+            {
+                *num = 0;
+            }
+            else
+            {
+                *num = *num + 1;
+            }
+        }
+        if (addRes < 0)
+        {
+            break;
+        }
+    }
+    gettimeofday(&end, NULL);
 
+    printf("Writing to every file:\n");
+    printf("\tIn seconds: %ld\n", end.tv_sec - start.tv_sec);
+    printf("\tIn microseconds: %ld\n",
+           (end.tv_sec * 1000000 + end.tv_usec) -
+               (start.tv_sec * 1000000 + start.tv_usec));
 
     printf("** sfs_umount ***\n");
     int res_umount = sfs_umount();
