@@ -514,95 +514,53 @@ int sfs_append(int fd, void *buf, int n)
 
     int index_block = get_index_block(open_file_table[fd].dirBlock, open_file_table[fd].dirBlockOffset);
     int byteCount = 0;
-    if(size == 0){
-        // no data exists
-        for (int i = 0; i < requiredBlockCount; i++)
-        {
-            //initialise the block
-            char block[BLOCKSIZE];
-            int index_block_offset = get_next_available_index_block(index_block);
-            ((int *)(block + i * DISK_PTR_SIZE))[0] = index_block_offset; 
-            write_block((void *)block, index_block);
-            // access to the index block
+    while (byteCount != n)
+    {
+        // get a new block or use the allocated
+        if(dataBlockOffset == BLOCKSIZE || dataBlockOffset == 0){
+            // allocate a new block
+            int index_block_ptr = alloc_next_index_block_ptr(index_block);
             char block_data[BLOCKSIZE];
             for (int i = 0; i < BLOCKSIZE; i++)
             {
+                // write data to the block
                 ((char *)(block_data + i))[0] = ((char *)(buf + byteCount))[0];
                 byteCount++;
                 if (byteCount == n)
                 {
-                    open_file_table[fd].directoryEntry.size = size + n;
+                    // early termination (found)
+                    write_block((void *)block_data, index_block_ptr);
+                    open_file_table[fd].directoryEntry.size = size + n; // update the size information
                     free_block_count -= requiredBlockCount;
-                    write_block((void *)block_data, index_block_offset);
-                    // terminate the program
-                    printf("LOG(sfs_append)\n");
-                    printf("\tLOG(sfs_append): (byte count: %d, n: %d )\n", byteCount, n);
                     return byteCount;
                 }
             }
-        }
-    } else {
-        // already data exists
-        int index_block_offset = 0;
-        char block[BLOCKSIZE];
-        read_block((void *)block, index_block);
-        int current_block_no = ((int *)(block + dataBlockNo * DISK_PTR_SIZE))[0];
-        int current_block_offset = dataBlockOffset;
-        char block_data[BLOCKSIZE];
-        if (current_block_no  < 0)
-        {
-            return -1;
-        }
-        write_block((void *)block_data, current_block_no);
-        for (int i = current_block_offset; i < BLOCKSIZE; i++)
-        {
-            ((char *)(block_data + i))[0] = ((char *)(buf + byteCount))[0];
-            byteCount++;
-            if (byteCount == n)
-            {
-                open_file_table[fd].directoryEntry.size = size + n;
-                free_block_count -= requiredBlockCount;
-                write_block((void *)block_data, current_block_no);
-                // terminate the program
-                printf("LOG(sfs_append)\n");
-                printf("\tLOG(sfs_append): (byte count: %d, n: %d )\n", byteCount, n);
-                return byteCount;
-            }
-        }
-        // if search still continues then get the next available index
-        for (int i = 0; i < requiredBlockCount; i++)
-        {
-            //initialise the block
-            char block[BLOCKSIZE];
-            int index_block_offset = get_next_available_index_block(index_block);
-            ((int *)(block + i * DISK_PTR_SIZE))[0] = index_block_offset; 
-            write_block((void *)block, index_block);
-            // access to the index block
+            write_block((void *)block_data, index_block_ptr);
+        } else {
+            // already data exists
+            int index_block_ptr = fetch_next_index_block_ptr(index_block);
             char block_data[BLOCKSIZE];
-            for (int i = 0; i < BLOCKSIZE; i++)
+            for (int i = dataBlockOffset; i < BLOCKSIZE; i++)
             {
+                // write data to the block
                 ((char *)(block_data + i))[0] = ((char *)(buf + byteCount))[0];
                 byteCount++;
                 if (byteCount == n)
                 {
-                    open_file_table[fd].directoryEntry.size = size + n;
+                    // early termination (found)
+                    write_block((void *)block_data, index_block_ptr);
+                    open_file_table[fd].directoryEntry.size = size + n; // update the size information
                     free_block_count -= requiredBlockCount;
-                    write_block((void *)block_data, index_block_offset);
-                    // terminate the program
-                    printf("LOG(sfs_append)\n");
-                    printf("\tLOG(sfs_append): (byte count: %d, n: %d )\n", byteCount, n);
                     return byteCount;
                 }
             }
+            // now we do not need to use an offset
+            dataBlockOffset = 0;
+            write_block((void *)block_data, index_block_ptr);
         }
     }
-    // check whether the data written properly
-    printf("LOG(sfs_append)\n");
-    printf("\tLOG(sfs_append): (byte count: %d, n: %d )\n", byteCount, n);
-    // increment the size of the file
-    open_file_table[fd].directoryEntry.size = size + n;
-    free_block_count -= requiredBlockCount;
-    return byteCount;
+    printf("LOG ERROR sys allocation");
+    return -1;
 }
 
 int sfs_delete(char *filename)
@@ -753,6 +711,7 @@ void set_bitmap_entry(int block_no, int bit){
     int startByte = block_no;
     ((int *)(block + startByte))[0] = bit;
     printf("LOG(set_bitmap_entry) (block no: %d, bit: %d)\n", block_no, bit);
+    write_block((void *)block, BITMAP_START);
 };
 
 /*
@@ -824,6 +783,77 @@ int get_available_index_block_offset(int index_block){
     }
     printf("LOG(get_available_index_block_offset) (index block no: %d, index block offser %d)\n", index_block, index_block_offset);
     return index_block_offset;
+}
+
+
+/*
+* Returns the last block no where the last non empty block index no points at
+*/
+int fetch_next_index_block_ptr(int index_block){
+    char block[BLOCKSIZE];
+    read_block((void *)block, index_block);
+    int prev_index_block_ptr = -1;
+    int index_block_ptr = -1;
+    for (int j = 0; j < INDEXING_BLOCK_PTR_COUNT; j++)
+    {
+        index_block_ptr = ((int *)(block + j * DISK_PTR_SIZE))[0];
+        if(index_block_ptr == -1 && prev_index_block_ptr  == -1){
+            printf("LOG NOOO BLOCK ALLOCATED YET");
+            return -1;
+        } else if(index_block_ptr == -1){
+            return prev_index_block_ptr;
+        }
+        prev_index_block_ptr = index_block_ptr;
+    }
+    printf("NOT FOUND");
+    return -1;
+}
+
+
+/*
+* Populates contents of a disk block with -1
+* this process makes it ready to use by the file system
+*/
+void init_file_block(int block_no){
+    char block[BLOCKSIZE];
+    for (int i = 0; i < BLOCKSIZE; i++)
+    {
+       ((int *)(block + i * BITMAP_BIT_SIZE))[0] = -1;
+    }
+     write_block((void *)block, block_no);
+}
+
+/*
+* Allocates a new block in the index block
+* populates the block with -1's 
+* returns the block no that is ready to use
+*/
+int alloc_next_index_block_ptr(int index_block){
+    char block[BLOCKSIZE];
+    read_block((void *)block, index_block);
+    int index_block_offset = -1;
+    for (int j = 0; j < INDEXING_BLOCK_PTR_COUNT; j++)
+    {
+        index_block_offset = ((int *)(block + j * DISK_PTR_SIZE))[0];
+        if(index_block_offset == -1){
+            // first empty position found
+            printf("LOG(alloc_index_block_ptr):  (index_block_offset: %d)\n", index_block_offset);
+            // get an available block from the system
+            int next_available_block = get_next_available_block();
+            if(next_available_block == -1){
+                printf("ERROR: No block available!");
+                return -1;
+            }
+            // set the block to where offset points 
+            ((int *)(block + j * DISK_PTR_SIZE))[0] = next_available_block;
+            write_block((void *)block, index_block);
+            printf("LOG(alloc_index_block_ptr):  (available block: %d)\n", ((int *)(block + j * DISK_PTR_SIZE))[0]);
+            // populate the block position with -1
+            init_file_block(next_available_block);
+            return next_available_block;
+        }
+    }
+    return -1;
 }
 
 

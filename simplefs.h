@@ -51,6 +51,12 @@ int get_next_available_block();
 
 int get_next_available_index_block();
 
+void init_file_block(int block_no);
+
+int alloc_next_index_block_ptr(int index_block);
+
+int fetch_next_index_block_ptr(int index_block);
+
 void init_fcb_entry(int fcbIndex, int block, int offset);
 
 // getters //

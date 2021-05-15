@@ -78,6 +78,29 @@ void test_app(){
         lastOpenFileIndex = i;
     }
 
+    printf("** sfs_append ***\n");
+    int a = 1;
+    int *num = malloc(sizeof(a));
+    *num = 1;
+    gettimeofday(&start, NULL);
+    counter = 0;
+
+    while (1)
+    { // only repeated write on a single file
+        int res = sfs_append(fileDescriptors[firstFileName], num, sizeof(int));
+        if (res < 0)
+        {
+            break;
+        }
+    }
+    gettimeofday(&end, NULL);
+
+    printf("Writing to a file time:\n");
+    printf("\tIn seconds: %ld\n", end.tv_sec - start.tv_sec);
+    printf("\tIn microseconds: %ld\n",
+           (end.tv_sec * 1000000 + end.tv_usec) -
+               (start.tv_sec * 1000000 + start.tv_usec));
+
 
 
     printf("** sfs_close ***\n");
