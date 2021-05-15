@@ -8,6 +8,9 @@
 #include "simplefs.h"
 #include <stdbool.h>
 #include <string.h>
+// @author: Zeynep Cankara
+// @date: 16/05/2020
+// @desc: Implementation of a simple file system (indexed allocation)
 
 // Visualisations for implementation reference
 // directory entry [filename | idx_FCB]
@@ -47,13 +50,13 @@
 struct DirEntry
 {
     char filename[MAX_FILENAME_LENGTH];
-    int size; //TODO: not sure needed or not
+    int size;  
     int fcbIndex;
 };
 
 struct FCBEntry
 {
-    int isUsed;
+    int used_flag;
     int indexBlockPtr;
     int fileSize;
 };
@@ -147,16 +150,15 @@ int create_format_vdisk (char *vdiskname, unsigned int m)
 
     // now write the code to format the disk below.
     // .. your code...
-
     vdisk_fd = open(vdiskname, O_RDWR);
     int data_count = count - header_count;
+    // initialise the file system substructures
     init_superblock(data_count);
     init_bitmap();
     init_FCB(data_count);
     init_root_directory();
     fsync(vdisk_fd); // copy everything in memory to disk
     close(vdisk_fd);
-    
     return (0); 
 }
 
@@ -168,12 +170,14 @@ int sfs_mount (char *vdiskname)
     // way make it ready to be used for other operations.
     // vdisk_fd is global; hence other function can use it. 
     vdisk_fd = open(vdiskname, O_RDWR); 
+    // initialise the superblock information
     get_superblock();
     for (int i = 0; i < 13; i++)
     {
         // mark the first 13 bitmap block unavailable
         get_next_available_block();
     }
+    // reset already allocated substructures
     clear_open_file_table();  
     return(0);
 }
@@ -182,15 +186,14 @@ int sfs_mount (char *vdiskname)
 // already implemented
 int sfs_umount ()
 {
-    // save the superblock data to the disk
+    // save the superblock
     set_superblock();
     for (int i = 0; i < MAX_NOF_OPEN_FILES; i++)
     {
-        
         if (open_file_table[i].dirBlock > -1)
         {
             printf("LOG(sfs_umount): directory block no: %d\n", open_file_table[i].dirBlock);
-            // close the open files
+            // close already open files before unmounting
             sfs_close(i);
         }
     }
@@ -208,67 +211,65 @@ int sfs_create(char *filename)
         printf("ERROR: No capacity available for file creation!\n");
         return -1;
     }
-
-    // check whether file with same name exist in the system
+    // Check whether file with same name exist in the system
     char block[BLOCKSIZE];
     // 1) iterate over root directory blocks
-    int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
+    int byte_pos_offset = (MAX_FILENAME_LENGTH + 8);
     for (int i = 0; i < ROOT_DIR_COUNT; i++)
     {
         read_block((void *)block, ROOT_DIR_START + i);
         // 2) iterate over directory entries
         for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
         {
-            int startByte = j * DIR_ENTRY_SIZE;
-            char isUsed = ((char *)(block + startByte + offsetFromStart))[0];
-            char name[MAX_FILENAME_LENGTH];
-            memcpy(name, ((char *)(block + startByte)), MAX_FILENAME_LENGTH);
-            if (isUsed == USED_FLAG && strcmp(name, filename) == 0)
+            char filename_block[MAX_FILENAME_LENGTH];
+            int byte_pos = j * DIR_ENTRY_SIZE;
+            char used_flag = ((char *)(block + byte_pos + byte_pos_offset))[0];
+            memcpy(filename_block, ((char *)(block + byte_pos)), MAX_FILENAME_LENGTH);
+            // The block needs to be used and have the same filename
+            if (used_flag == USED_FLAG && strcmp(filename_block, filename) == 0)
             {
                 printf("ERROR: File with the same name already created!\n");
                 return -1;
             }
         }
     }
-
-    int dirBlock = -1; // relative to start of root directory
+    // search for the empty directory position
+    int dirBlock = -1;  
     int dirBlockOffset = -1;
-    bool found = false;
+    bool seen = false;
     for (int i = 0; i < ROOT_DIR_COUNT; i++)
     {
         read_block((void *)block, ROOT_DIR_START + i);
         for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
         {
-            int startByte = j * DIR_ENTRY_SIZE;
-            char isUsed = ((char *)(block + startByte + offsetFromStart))[0];
-            if (isUsed == NOT_USED_FLAG)
+            int byte_pos = j * DIR_ENTRY_SIZE;
+            char used_flag = ((char *)(block + byte_pos + byte_pos_offset))[0];
+            if (used_flag == NOT_USED_FLAG)
             {
                 dirBlock = i;
                 dirBlockOffset = j;
                 printf("LOG(sfs_create): Empty directory entry is found (block: %d, offset: %d)!\n", i, j);
-                found = true;
+                seen = true;
                 break;
             }
         }
-        if (found)
+        if (seen)
         {
             break;
         }
     }
-
-    int startByte = dirBlockOffset * DIR_ENTRY_SIZE;
+    int byte_pos = dirBlockOffset * DIR_ENTRY_SIZE;
     // write the filename
     for (int i = 0; i < strlen(filename); i++)
     {
-        ((char *)(block + startByte + i))[0] = filename[i];
+        ((char *)(block + byte_pos + i))[0] = filename[i];
     }
-    memcpy(((char *)(block + startByte)), filename, MAX_FILENAME_LENGTH);
-    ((int *)(block + startByte + MAX_FILENAME_LENGTH))[0] = 0;   // size of the file
-    ((int *)(block + startByte + (MAX_FILENAME_LENGTH + 4)))[0] = file_count;  // index to the FCB (previously -1, made it file count)
-    ((char *)(block + startByte + (MAX_FILENAME_LENGTH + 8)))[0] = USED_FLAG; // mark as used
+    memcpy(((char *)(block + byte_pos)), filename, MAX_FILENAME_LENGTH);
+    ((int *)(block + byte_pos + MAX_FILENAME_LENGTH))[0] = 0;   // size of the file
+    ((int *)(block + byte_pos + (MAX_FILENAME_LENGTH + 4)))[0] = file_count;  // index to the FCB (previously -1, made it file count)
+    ((char *)(block + byte_pos + (MAX_FILENAME_LENGTH + 8)))[0] = USED_FLAG; // mark as used
     // setup the index block for the file
     init_fcb_entry(file_count, dirBlock, dirBlockOffset);
-
     int res = write_block((void *)block, dirBlock + ROOT_DIR_START);
     if (res == -1)
     {
@@ -277,7 +278,6 @@ int sfs_create(char *filename)
     }
     // increment the number of files
     file_count++;
-
     return (0);
 }
 
@@ -313,9 +313,9 @@ int sfs_open(char *file, int mode)
         }
     }
     // find in the directory structure
-    bool found = false;
+    bool seen = false;
     char block[BLOCKSIZE];
-    int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
+    int byte_pos_offset = (MAX_FILENAME_LENGTH + 8);
     // iterate through root directory blocks
     for (int i = 0; i < ROOT_DIR_COUNT; i++)
     {
@@ -323,11 +323,11 @@ int sfs_open(char *file, int mode)
         // iterate through the directory entries
         for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
         {
-            int startByte = j * DIR_ENTRY_SIZE;
-            char isUsed = ((char *)(block + startByte + offsetFromStart))[0];
+            int byte_pos = j * DIR_ENTRY_SIZE;
+            char used_flag = ((char *)(block + byte_pos + byte_pos_offset))[0];
             char filename[MAX_FILENAME_LENGTH];
-            memcpy(filename, ((char *)(block + startByte)), MAX_FILENAME_LENGTH);
-            if (isUsed == USED_FLAG && strcmp(file, filename) == 0)
+            memcpy(filename, ((char *)(block + byte_pos)), MAX_FILENAME_LENGTH);
+            if (used_flag == USED_FLAG && strcmp(file, filename) == 0)
             { 
                 // the file found in the directory structure
                 // init the attributes of the directory entry
@@ -336,14 +336,14 @@ int sfs_open(char *file, int mode)
                 open_file_table[fd].openMode = mode;
                 open_file_table[fd].readPointer = 0;
                 memcpy(open_file_table[fd].directoryEntry.filename, filename, MAX_FILENAME_LENGTH);
-                open_file_table[fd].directoryEntry.size = ((int *)(block + startByte + MAX_FILENAME_LENGTH))[0];
-                open_file_table[fd].directoryEntry.fcbIndex = ((int *)(block + startByte + (MAX_FILENAME_LENGTH+4)))[0];
+                open_file_table[fd].directoryEntry.size = ((int *)(block + byte_pos + MAX_FILENAME_LENGTH))[0];
+                open_file_table[fd].directoryEntry.fcbIndex = ((int *)(block + byte_pos + (MAX_FILENAME_LENGTH+4)))[0];
                 open_file_count++;
-                found = true;
+                seen = true;
                 break;
             }
         }
-        if (found)
+        if (seen)
             break;
     }
     return fd;
@@ -361,7 +361,6 @@ int sfs_close(int fd){
     // clear the open file table related to the directory
     open_file_table[fd].dirBlock = -1;
     open_file_count--;
-
     return (0); 
 }
 
@@ -393,7 +392,6 @@ int sfs_read(int fd, void *buf, int n){
     }
     // get the data about the directory entry
     int size_file = open_file_table[fd].directoryEntry.size;
-    int fcb_index_file = open_file_table[fd].directoryEntry.fcbIndex;
     int read_ptr_file = open_file_table[fd].readPointer;
     int end_read_ptr_file = read_ptr_file + n;
     if (size_file < end_read_ptr_file)
@@ -510,7 +508,6 @@ int sfs_append(int fd, void *buf, int n)
     printf("LOG(sfs_append): (filename: %s, fcb index: %d)\n", open_file_table[fd].directoryEntry.filename, fcbIndex);
 
     int dataBlockOffset = size % BLOCKSIZE;
-    int dataBlockNo = size / BLOCKSIZE;
     printf("LOG(sfs_append): (data_block_offset: %d)\n", dataBlockOffset);
     if (dataBlockOffset == 0)
     {
@@ -598,25 +595,25 @@ int sfs_delete(char *filename)
 
     // find the file with the filename within the system
     char block[BLOCKSIZE];
-    int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
+    int byte_pos_offset = (MAX_FILENAME_LENGTH + 8);
     for (int i = 0; i < ROOT_DIR_COUNT; i++)
     {
         read_block((void *)block, ROOT_DIR_START + i);
         for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
         {
-            int startByte = j * DIR_ENTRY_SIZE;
-            char isUsed = ((char *)(block + startByte + offsetFromStart))[0];
-            char name[MAX_FILENAME_LENGTH];
-            memcpy(name, ((char *)(block + startByte)), MAX_FILENAME_LENGTH);
-            if (isUsed == USED_FLAG && strcmp(name, filename) == 0)
+            int byte_pos = j * DIR_ENTRY_SIZE;
+            char used_flag = ((char *)(block + byte_pos + byte_pos_offset))[0];
+            char filename_buffer[MAX_FILENAME_LENGTH];
+            memcpy(filename_buffer, ((char *)(block + byte_pos)), MAX_FILENAME_LENGTH);
+            if (used_flag == USED_FLAG && strcmp(filename_buffer, filename) == 0)
             {
                 printf("LOG(sfs_delete): find the file in the system!\n");
-                ((char*)(block + startByte + offsetFromStart))[0] = NOT_USED_FLAG;
-                offsetFromStart -= 4;
+                ((char*)(block + byte_pos + byte_pos_offset))[0] = NOT_USED_FLAG;
+                byte_pos_offset -= 4;
                 block_no_fcb = i;
                 block_offset_fcb = j;
-                offsetFromStart -= 4;
-                ((char*)(block + startByte + offsetFromStart))[0] = 0; // size = 0
+                byte_pos_offset -= 4;
+                ((char*)(block + byte_pos + byte_pos_offset))[0] = 0; // size = 0
                 write_block((void *)block, ROOT_DIR_START + i);
             }
         }
@@ -631,10 +628,10 @@ int sfs_delete(char *filename)
     // find the fcb block to deallocate
     char ablock[BLOCKSIZE];
     read_block((void *)ablock, block_no_fcb + FCB_START);
-    int startByte = block_offset_fcb * FCB_SIZE;
-    ((int *)(ablock + startByte))[0] = NOT_USED_FLAG; // mark the fcb block as not used
-    index_block = ((char *)(ablock + startByte + 4))[0] ; // save the index block for further deallocation
-    ((int *)(ablock + startByte + 8))[0] = 0; // deallocate the size
+    int byte_pos = block_offset_fcb * FCB_SIZE;
+    ((int *)(ablock + byte_pos))[0] = NOT_USED_FLAG; // mark the fcb block as not used
+    index_block = ((char *)(ablock + byte_pos + 4))[0] ; // save the index block for further deallocation
+    ((int *)(ablock + byte_pos + 8))[0] = 0; // deallocate the size
     write_block((void *)ablock, block_no_fcb + FCB_START);
 
     //deallocate the index block
@@ -713,14 +710,13 @@ void init_FCB(int data_count)
 void init_root_directory()
 {
     char block[BLOCKSIZE];
-    // TODO(zcankara) decide necessary or not
-    int offsetFromStart = (MAX_FILENAME_LENGTH + 8);
+    int byte_pos_offset = (MAX_FILENAME_LENGTH + 8);
     for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
     {
-        int startByte = j * DIR_ENTRY_SIZE;
-        ((char *)(block + startByte + offsetFromStart))[0] = NOT_USED_FLAG;
+        int byte_pos = j * DIR_ENTRY_SIZE;
+        ((char *)(block + byte_pos + byte_pos_offset))[0] = NOT_USED_FLAG;
     }
-    // write to the disk
+    // write to the disk the root directory information
     for (int i = 0; i < ROOT_DIR_COUNT; i++)
     {
         write_block((void *)block, ROOT_DIR_START + i);
@@ -768,10 +764,10 @@ void set_directory_entry(int fd){
     char block[BLOCKSIZE];
     // get the directory entry location responsible of the file
     read_block((void *)block, open_file_table[fd].dirBlock + ROOT_DIR_START);
-    int startByte = open_file_table[fd].dirBlockOffset * DIR_ENTRY_SIZE;
-    ((int *)(block + startByte + MAX_FILENAME_LENGTH))[0] = open_file_table[fd].directoryEntry.size;
-    ((int *)(block + startByte + (MAX_FILENAME_LENGTH + 4)))[0] = open_file_table[fd].directoryEntry.fcbIndex;
-    ((char *)(block + startByte + (MAX_FILENAME_LENGTH + 8)))[0] = USED_FLAG;
+    int byte_pos = open_file_table[fd].dirBlockOffset * DIR_ENTRY_SIZE;
+    ((int *)(block + byte_pos + MAX_FILENAME_LENGTH))[0] = open_file_table[fd].directoryEntry.size;
+    ((int *)(block + byte_pos + (MAX_FILENAME_LENGTH + 4)))[0] = open_file_table[fd].directoryEntry.fcbIndex;
+    ((char *)(block + byte_pos + (MAX_FILENAME_LENGTH + 8)))[0] = USED_FLAG;
     write_block((void *)block, open_file_table[fd].dirBlock + ROOT_DIR_START);
     printf("LOG(set_directory_entry) the data written to the disk for fd: %d\n", fd);
     printf("\tLOG(set_directory_entry): (size: %d) \n", open_file_table[fd].directoryEntry.size);
@@ -1000,18 +996,4 @@ int get_index_block(int block_no, int block_offset){
         return -1;
     }
     return index_block;
-}
-
-
-
-void get_bitmap(){
-    //return (0);
-}
-
-void get_root_dir_entry(){
-    //return (0);
-}
-
-void get_fcb(){
-    //return (0);
 }

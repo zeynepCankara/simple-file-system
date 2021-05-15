@@ -1,19 +1,28 @@
 Zeynep Cankara - 21703381
 
+
+Contents:
+- simplefs.c
+- simplefs.h  
+- test.c
+- Makefile
+- report.pdf (contains experimental results) 
+
 How to Run:
 
 - cd to the project directory.
 - compilation and linking done by:
 $ make
 
-- in order to recompile:
+- In order to recompile:
 $ make clean
 $ make
 
 - Running the program:
-$ ./app
+$ ./create_format <FILENAME> <SIZE>
+$ ./app <FILENAME>  
 
-- Running the test:
+- Running the test (for experiments):
 $ ./test
 
 
