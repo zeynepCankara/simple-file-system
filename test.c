@@ -16,6 +16,96 @@ void is_res_pass(int res, int counter)
     }
 }
 
+void test_app(){
+    struct timeval start;
+    struct timeval end;
+    int res_create;
+    gettimeofday(&start, NULL);
+    int counter = 0;
+    int firstFileName = 0;
+    char *vfs_name = "vfs";
+
+    printf("** create_format_vdisk ***\n");
+    res_create = create_format_vdisk(vfs_name, 20); //NOTE: Max disk size 128 MB
+    is_res_pass(res_create, counter);
+    gettimeofday(&end, NULL);
+
+
+    printf("** Timing Experiment for the formatting the disk ***\n");
+    printf("\tSeconds (s): %ld\n", end.tv_sec - start.tv_sec);
+    printf("\tMicroseconds (ms): %ld\n",
+           (end.tv_sec * 1000000 + end.tv_usec) -
+               (start.tv_sec * 1000000 + start.tv_usec));
+
+    printf("** sfs_mount ***\n");
+    counter++;
+    int mountRes = sfs_mount(vfs_name);
+    is_res_pass(mountRes, counter);
+
+    // create an example file
+    counter++;
+    printf("** sfs_create ***\n");
+    int res_create_file = sfs_create("vfs.txt");
+    is_res_pass(res_create_file, counter);
+    // create consecutive files
+    int *myFileDescriptors = malloc(1000000 * sizeof(int));
+    char myFileName[1000000];
+    int lastFileName;
+    for (int i = 0; i < 120; i++) // populate the directory (passed tests)
+    {
+        printf("[test] file create: %d!  \n", i);
+        sprintf(myFileName, "%d", i);
+        res_create_file = sfs_create(myFileName);
+        if (res_create_file < 0)
+        {
+            break;
+        }
+        lastFileName = i;
+    }
+
+    printf("** sfs_open ***\n");
+    int *fileDescriptors = malloc((lastFileName + 1) * sizeof(int));
+    int lastOpenFileIndex;
+    for (int i = 0; i <= lastFileName; i++)
+    {
+        sprintf(myFileName, "%d", i);
+        printf("[test] file open: %d!  \n", i);
+        fileDescriptors[i] = sfs_open(myFileName, MODE_APPEND);
+        if (fileDescriptors[i] < 0)
+        {
+            break;
+        }
+        lastOpenFileIndex = i;
+    }
+
+
+
+    printf("** sfs_close ***\n");
+    int res = sfs_close(fileDescriptors[firstFileName]);
+    if (res < 0)
+    {
+        return;
+    }
+
+    printf("** test reopen file and close ***\n");
+    sprintf(myFileName, "%d", firstFileName);
+    fileDescriptors[firstFileName] = sfs_open(myFileName, MODE_READ);
+    if (fileDescriptors[firstFileName] < 0)
+    {
+        return;
+    }
+    sfs_close(fileDescriptors[firstFileName]); // close the same file
+
+    printf("** sfs_umount ***\n");
+    int res_umount = sfs_umount();
+    if (res_umount < 0)
+    {
+        printf("ERROR: Can't umount the file system!\n");
+    }
+    printf("[test] success!\n");
+
+}
+
 void timing_experiments(){
     struct timeval start;
     struct timeval end;
@@ -106,7 +196,7 @@ void timing_experiments(){
 
     printf("reopening the same file\n");
     sprintf(myFileName, "%d", firstFileName);
-    fileDescriptors[firstFileName] = vsfs_open(myFileName, MODE_READ);
+    fileDescriptors[firstFileName] = sfs_open(myFileName, MODE_READ);
     if (fileDescriptors[firstFileName] < 0)
     {
         return;
@@ -284,8 +374,9 @@ int main(int argc, char **argv)
 {
 
 
-    timing_experiments();
+    //timing_experiments();
     //timing_experiments2();
+    test_app();
 
     return (0);
 
