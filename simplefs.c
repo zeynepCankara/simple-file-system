@@ -186,9 +186,10 @@ int sfs_umount ()
     set_superblock();
     for (int i = 0; i < MAX_NOF_OPEN_FILES; i++)
     {
-        printf("LOG(sfs_umount): directory block no: %d\n", open_file_table[i].dirBlock);
+        
         if (open_file_table[i].dirBlock > -1)
         {
+            printf("LOG(sfs_umount): directory block no: %d\n", open_file_table[i].dirBlock);
             // close the open files
             sfs_close(i);
         }
