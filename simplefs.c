@@ -413,9 +413,9 @@ int sfs_read(int fd, void *buf, int n){
 
  
     int index_block = get_index_block(open_file_table[fd].dirBlock, open_file_table[fd].dirBlockOffset);
-    int byteCount = 0;
-    void *bufPtr = buf;
-    //printf("\tLOG(sfs_read): START(byteCount %d ) \n", byteCount);
+    int byte_cnt = 0;
+    void *buffer_ptr = buf;
+    //printf("\tLOG(sfs_read): START(byte_cnt %d ) \n", byte_cnt);
     // iterate until n bytes are read
     char block[BLOCKSIZE];
     read_block((void *)block, index_block); 
@@ -428,9 +428,9 @@ int sfs_read(int fd, void *buf, int n){
         read_block((void *)block_data, index_block_ptr);
         for (int i = start_block_offset; i <  end_block_offset; i++)
         {
-            ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
-            bufPtr += 1;
-            byteCount++;
+            ((char *)(buffer_ptr))[0] = ((char *)(block_data + i))[0];
+            buffer_ptr += 1;
+            byte_cnt++;
         }
         
     } else {
@@ -447,9 +447,9 @@ int sfs_read(int fd, void *buf, int n){
                 read_block((void *)block_data, index_block_ptr);
                 for (int i = start_block_count; i < BLOCKSIZE; i++)
                 {
-                    ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
-                    bufPtr += 1;
-                    byteCount++;
+                    ((char *)(buffer_ptr))[0] = ((char *)(block_data + i))[0];
+                    buffer_ptr += 1;
+                    byte_cnt++;
                 }
             }
             else if(i == end_block_count){
@@ -458,9 +458,9 @@ int sfs_read(int fd, void *buf, int n){
                 read_block((void *)block_data, index_block_ptr);
                 for (int i = 0; i < end_block_offset; i++)
                 {
-                    ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
-                    bufPtr += 1;
-                    byteCount++;
+                    ((char *)(buffer_ptr))[0] = ((char *)(block_data + i))[0];
+                    buffer_ptr += 1;
+                    byte_cnt++;
                 }
             } else {
                 // read the entire block
@@ -468,19 +468,19 @@ int sfs_read(int fd, void *buf, int n){
                 read_block((void *)block_data, index_block_ptr);
                 for (int i = 0; i < BLOCKSIZE; i++)
                 {
-                    ((char *)(bufPtr))[0] = ((char *)(block_data + i))[0];
-                    bufPtr += 1;
-                    byteCount++;
+                    ((char *)(buffer_ptr))[0] = ((char *)(block_data + i))[0];
+                    buffer_ptr += 1;
+                    byte_cnt++;
                 }
             }
            
         }
     }
     
-    //printf("\tLOG(sfs_read): END(byteCount %d ) \n", byteCount);
+    //printf("\tLOG(sfs_read): END(byte_cnt %d ) \n", byte_cnt);
     // increment the file pointer
     open_file_table[fd].readPtr = end_read_ptr_file;
-    return byteCount; 
+    return byte_cnt; 
 }
 
 
@@ -528,8 +528,8 @@ int sfs_append(int fd, void *buf, int n)
     } 
 
     int index_block = get_index_block(open_file_table[fd].dirBlock, open_file_table[fd].dirBlockOffset);
-    int byteCount = 0;
-    while (byteCount != n)
+    int byte_cnt = 0;
+    while (byte_cnt != n)
     {
         // get a new block or use the allocated
         if(dataBlockOffset == BLOCKSIZE || dataBlockOffset == 0){
@@ -539,15 +539,15 @@ int sfs_append(int fd, void *buf, int n)
             for (int i = 0; i < BLOCKSIZE; i++)
             {
                 // write data to the block
-                ((char *)(block_data + i))[0] = ((char *)(buf + byteCount))[0];
-                byteCount++;
-                if (byteCount == n)
+                ((char *)(block_data + i))[0] = ((char *)(buf + byte_cnt))[0];
+                byte_cnt++;
+                if (byte_cnt == n)
                 {
                     // early termination (found)
                     write_block((void *)block_data, index_block_ptr);
                     open_file_table[fd].directoryEntry.size = size + n; // update the size information
                     free_block_count -= requiredBlockCount;
-                    return byteCount;
+                    return byte_cnt;
                 }
             }
             write_block((void *)block_data, index_block_ptr);
@@ -558,15 +558,15 @@ int sfs_append(int fd, void *buf, int n)
             for (int i = dataBlockOffset; i < BLOCKSIZE; i++)
             {
                 // write data to the block
-                ((char *)(block_data + i))[0] = ((char *)(buf + byteCount))[0];
-                byteCount++;
-                if (byteCount == n)
+                ((char *)(block_data + i))[0] = ((char *)(buf + byte_cnt))[0];
+                byte_cnt++;
+                if (byte_cnt == n)
                 {
                     // early termination (found)
                     write_block((void *)block_data, index_block_ptr);
                     open_file_table[fd].directoryEntry.size = size + n; // update the size information
                     free_block_count -= requiredBlockCount;
-                    return byteCount;
+                    return byte_cnt;
                 }
             }
             // now we do not need to use an offset
