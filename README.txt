@@ -4,7 +4,7 @@ Zeynep Cankara - 21703381
 Contents:
 - simplefs.c
 - simplefs.h  
-- test.c
+- test.c (contains the experiments for the tests)
 - Makefile
 - report.pdf (contains experimental results) 
 
@@ -22,7 +22,7 @@ $ make
 $ ./create_format <FILENAME> <SIZE>
 $ ./app <FILENAME>  
 
-- Running the test (for experiments):
+- Running the test (for experiments in the report):
 $ ./test
 
 
