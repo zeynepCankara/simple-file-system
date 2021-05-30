@@ -5,17 +5,16 @@ Implementation of a simple file system with indexed allocation
 Contents:
 - simplefs.c
 - simplefs.h
-- test.c (contains the experiments for the tests)
 - Makefile
+- test.c (contains the experiments for the tests)
 - report.pdf (contains experimental results)
 
 How to Run:
-
 - cd to the project directory.
 - compilation and linking done by:
 $ make
 
-- In order to recompile:
+- Recompile:
 $ make clean
 $ make
 
@@ -25,9 +24,3 @@ $ ./app <FILENAME>
 
 - Running the test (for experiments in the report):
 $ ./test
-
-
-
-
-
-
