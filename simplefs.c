@@ -21,7 +21,7 @@
 // Definitions
 // block access related (4 KB BLOCKSIZE defines in simplefs.h)
 #define SUPERBLOCK_START 0 // Block 0
-#define SUPERBLOCK_COUNT 1 
+#define SUPERBLOCK_COUNT 1
 #define BITMAP_START 1 // Blocks {1,2,3,4}
 #define BITMAP_COUNT 4
 #define ROOT_DIR_START 5 // Blocks {5,6,7,8}
@@ -29,29 +29,28 @@
 #define FCB_START 9 // Blocks {9, 10, 11, 12}
 #define FCB_COUNT 4
 // file system structure related
-#define DIR_ENTRY_SIZE 128 // Bytes
-#define DIR_ENTRY_PER_BLOCK 32 // 4KB (BLOCKSIZE)/128 Bytes (DIR_ENTRY_SIZE)
-#define DIR_ENTRY_COUNT 128 // 4(ROOT_DIR_COUNT) * 32 (DIR_ENTRY_PER_BLOCK)
-#define FCB_SIZE 128 // Bytes
-#define FCB_PER_BLOCK 32 // 4KB (BLOCKSIZE)/128 Bytes (FCB_SIZE)
-#define BITMAP_BIT_PER_BLOCK 4096 // 4KB
-#define BITMAP_BIT_SIZE 1 // bit
-#define DISK_PTR_SIZE 4 // Bytes (32 bits)
-#define BLOCK_NO_SIZE 4 // Bytes (32 bits)
+#define DIR_ENTRY_SIZE 128            // Bytes
+#define DIR_ENTRY_PER_BLOCK 32        // 4KB (BLOCKSIZE)/128 Bytes (DIR_ENTRY_SIZE)
+#define DIR_ENTRY_COUNT 128           // 4(ROOT_DIR_COUNT) * 32 (DIR_ENTRY_PER_BLOCK)
+#define FCB_SIZE 128                  // Bytes
+#define FCB_PER_BLOCK 32              // 4KB (BLOCKSIZE)/128 Bytes (FCB_SIZE)
+#define BITMAP_BIT_PER_BLOCK 4096     // 4KB
+#define BITMAP_BIT_SIZE 1             // bit
+#define DISK_PTR_SIZE 4               // Bytes (32 bits)
+#define BLOCK_NO_SIZE 4               // Bytes (32 bits)
 #define INDEXING_BLOCK_PTR_COUNT 1024 // (4KB  (BLOCKSIZE)  / 4 Bytes (DISK_PTR_SIZE))
-#define MAX_NOF_FILES 128 // same as (DIR_ENTRY_COUNT)
-#define MAX_FILENAME_LENGTH 110 // characters
-#define MAX_NOF_OPEN_FILES 16  
+#define MAX_NOF_FILES 128             // same as (DIR_ENTRY_COUNT)
+#define MAX_FILENAME_LENGTH 110       // characters
+#define MAX_NOF_OPEN_FILES 16
 #define MAX_FILE_SIZE 4194304 // 4MB = 4KB (BLOCKSIZE) * (4KB / 4 Bytes)(INDEXING_BLOCK_PTR_COUNT)
 #define NOT_USED_FLAG 0
 #define USED_FLAG 1
-
 
 // directory structures
 struct DirEntry
 {
     char filename[MAX_FILENAME_LENGTH];
-    int size;  
+    int size;
     int fcbIndex;
 };
 
@@ -71,12 +70,11 @@ struct File
     int readPtr;
 };
 
-
 // Global Variables =======================================
 int vdisk_fd; // Global virtual disk file descriptor. Global within the library.
               // Will be assigned with the vsfs_mount call.
               // Any function in this file can use this.
-              // Applications will not use  this directly. 
+              // Applications will not use  this directly.
 // ========================================================
 // read from superblock (Block 0)
 int data_count;
@@ -87,67 +85,67 @@ int file_count;
 int open_file_count = 0;
 struct File open_file_table[MAX_NOF_FILES]; //contains file index or -1
 
-
 // read block k from disk (virtual disk) into buffer block.
 // size of the block is BLOCKSIZE.
 // space for block must be allocated outside of this function.
-// block numbers start from 0 in the virtual disk. 
-int read_block (void *block, int k)
+// block numbers start from 0 in the virtual disk.
+int read_block(void *block, int k)
 {
     int n;
     int offset;
 
     offset = k * BLOCKSIZE;
-    lseek(vdisk_fd, (off_t) offset, SEEK_SET);
-    n = read (vdisk_fd, block, BLOCKSIZE);
-    if (n != BLOCKSIZE) {
-	printf ("read error\n");
-	return -1;
+    lseek(vdisk_fd, (off_t)offset, SEEK_SET);
+    n = read(vdisk_fd, block, BLOCKSIZE);
+    if (n != BLOCKSIZE)
+    {
+        printf("read error\n");
+        return -1;
     }
-    return (0); 
+    return (0);
 }
 
-// write block k into the virtual disk. 
-int write_block (void *block, int k)
+// write block k into the virtual disk.
+int write_block(void *block, int k)
 {
     int n;
     int offset;
 
     offset = k * BLOCKSIZE;
-    lseek(vdisk_fd, (off_t) offset, SEEK_SET);
-    n = write (vdisk_fd, block, BLOCKSIZE);
-    if (n != BLOCKSIZE) {
-	printf ("write error\n");
-	return (-1);
+    lseek(vdisk_fd, (off_t)offset, SEEK_SET);
+    n = write(vdisk_fd, block, BLOCKSIZE);
+    if (n != BLOCKSIZE)
+    {
+        printf("write error\n");
+        return (-1);
     }
-    return 0; 
+    return 0;
 }
-
 
 /**********************************************************************
-   The following functions are to be called by applications directly. 
+   The following functions are to be called by applications directly.
 ***********************************************************************/
 
 // this function is partially implemented.
-int create_format_vdisk (char *vdiskname, unsigned int m)
+int create_format_vdisk(char *vdiskname, unsigned int m)
 {
     char command[1000];
     int size;
     int num = 1;
     int count;
-    size  = num << m;
+    size = num << m;
     count = size / BLOCKSIZE;
-    printf ("LOG(create_format_vdisk): (m: %d, size: %d) \n", m, size);
+    printf("LOG(create_format_vdisk): (m: %d, size: %d) \n", m, size);
     int header_count = SUPERBLOCK_COUNT + ROOT_DIR_COUNT + FCB_COUNT;
     if (count < header_count)
     {
-        printf("ERROR: Larger disk size required!\n"); 
+        printf("ERROR: Larger disk size required!\n");
         return -1;
     }
-    sprintf (command, "dd if=/dev/zero of=%s bs=%d count=%d",
-             vdiskname, BLOCKSIZE, count);
+    sprintf(command, "dd if=/dev/zero of=%s bs=%d count=%d",
+            vdiskname, BLOCKSIZE, count);
     //printf ("executing command = %s\n", command);
-    system (command);
+    system(command);
 
     // now write the code to format the disk below.
     // .. your code...
@@ -160,17 +158,16 @@ int create_format_vdisk (char *vdiskname, unsigned int m)
     init_root_directory();
     fsync(vdisk_fd); // copy everything in memory to disk
     close(vdisk_fd);
-    return (0); 
+    return (0);
 }
 
-
 // already implemented
-int sfs_mount (char *vdiskname)
+int sfs_mount(char *vdiskname)
 {
     // simply open the Linux file vdiskname and in this
     // way make it ready to be used for other operations.
-    // vdisk_fd is global; hence other function can use it. 
-    vdisk_fd = open(vdiskname, O_RDWR); 
+    // vdisk_fd is global; hence other function can use it.
+    vdisk_fd = open(vdiskname, O_RDWR);
     // initialise the superblock information
     get_superblock();
     for (int i = 0; i < 13; i++)
@@ -179,13 +176,11 @@ int sfs_mount (char *vdiskname)
         get_next_available_block();
     }
     // reset already allocated substructures
-    clear_open_file_table();  
-    return(0);
+    clear_open_file_table();
+    return (0);
 }
 
-
-// already implemented
-int sfs_umount ()
+int sfs_umount()
 {
     // save the superblock
     set_superblock();
@@ -198,11 +193,10 @@ int sfs_umount ()
             sfs_close(i);
         }
     }
-    fsync (vdisk_fd); // copy everything in memory to disk
-    close (vdisk_fd);
-    return (0); 
+    fsync(vdisk_fd); // copy everything in memory to disk
+    close(vdisk_fd);
+    return (0);
 }
-
 
 int sfs_create(char *filename)
 {
@@ -212,21 +206,18 @@ int sfs_create(char *filename)
         printf("ERROR: No capacity available for file creation!\n");
         return -1;
     }
-    // Check whether file with same name exist in the system
+    // check file with the same name
     char block[BLOCKSIZE];
-    // 1) iterate over root directory blocks
     int byte_pos_offset = (MAX_FILENAME_LENGTH + 8);
     for (int i = 0; i < ROOT_DIR_COUNT; i++)
     {
         read_block((void *)block, ROOT_DIR_START + i);
-        // 2) iterate over directory entries
         for (int j = 0; j < DIR_ENTRY_PER_BLOCK; j++)
         {
             char filename_block[MAX_FILENAME_LENGTH];
             int byte_pos = j * DIR_ENTRY_SIZE;
             char used_flag = ((char *)(block + byte_pos + byte_pos_offset))[0];
             memcpy(filename_block, ((char *)(block + byte_pos)), MAX_FILENAME_LENGTH);
-            // The block needs to be used and have the same filename
             if (used_flag == USED_FLAG && strcmp(filename_block, filename) == 0)
             {
                 printf("ERROR: File with the same name already created!\n");
@@ -235,7 +226,7 @@ int sfs_create(char *filename)
         }
     }
     // search for the empty directory position
-    int dirBlock = -1;  
+    int dirBlock = -1;
     int dirBlockOffset = -1;
     bool seen = false;
     for (int i = 0; i < ROOT_DIR_COUNT; i++)
@@ -266,8 +257,8 @@ int sfs_create(char *filename)
         ((char *)(block + byte_pos + i))[0] = filename[i];
     }
     memcpy(((char *)(block + byte_pos)), filename, MAX_FILENAME_LENGTH);
-    ((int *)(block + byte_pos + MAX_FILENAME_LENGTH))[0] = 0;   // size of the file
-    ((int *)(block + byte_pos + (MAX_FILENAME_LENGTH + 4)))[0] = file_count;  // index to the FCB (previously -1, made it file count)
+    ((int *)(block + byte_pos + MAX_FILENAME_LENGTH))[0] = 0;                // size of the file
+    ((int *)(block + byte_pos + (MAX_FILENAME_LENGTH + 4)))[0] = file_count; // index to the FCB (previously -1, made it file count)
     ((char *)(block + byte_pos + (MAX_FILENAME_LENGTH + 8)))[0] = USED_FLAG; // mark as used
     // setup the index block for the file
     init_fcb_entry(file_count, dirBlock, dirBlockOffset);
@@ -282,7 +273,6 @@ int sfs_create(char *filename)
     return (0);
 }
 
-
 int sfs_open(char *file, int mode)
 {
     // check limit of opening files
@@ -296,7 +286,7 @@ int sfs_open(char *file, int mode)
     for (int i = 0; i < MAX_NOF_OPEN_FILES; i++)
     {
         if (open_file_table[i].dirBlock > -1 && strcmp(open_file_table[i].directoryEntry.filename, file) == 0)
-        { 
+        {
             printf("ERROR: File already opened!\n");
             return -1;
         }
@@ -307,7 +297,7 @@ int sfs_open(char *file, int mode)
     for (int i = 0; i < MAX_NOF_OPEN_FILES; i++)
     {
         if (open_file_table[i].dirBlock == -1)
-        { 
+        {
             // available block position
             fd = i;
             break;
@@ -329,7 +319,7 @@ int sfs_open(char *file, int mode)
             char filename[MAX_FILENAME_LENGTH];
             memcpy(filename, ((char *)(block + byte_pos)), MAX_FILENAME_LENGTH);
             if (used_flag == USED_FLAG && strcmp(file, filename) == 0)
-            { 
+            {
                 // the file found in the directory structure
                 // init the attributes of the directory entry
                 open_file_table[fd].dirBlock = i;
@@ -338,7 +328,7 @@ int sfs_open(char *file, int mode)
                 open_file_table[fd].readPtr = 0;
                 memcpy(open_file_table[fd].directoryEntry.filename, filename, MAX_FILENAME_LENGTH);
                 open_file_table[fd].directoryEntry.size = ((int *)(block + byte_pos + MAX_FILENAME_LENGTH))[0];
-                open_file_table[fd].directoryEntry.fcbIndex = ((int *)(block + byte_pos + (MAX_FILENAME_LENGTH+4)))[0];
+                open_file_table[fd].directoryEntry.fcbIndex = ((int *)(block + byte_pos + (MAX_FILENAME_LENGTH + 4)))[0];
                 open_file_count++;
                 seen = true;
                 break;
@@ -350,7 +340,8 @@ int sfs_open(char *file, int mode)
     return fd;
 }
 
-int sfs_close(int fd){
+int sfs_close(int fd)
+{
     if (is_file_opened(fd) == -1)
     {
         printf("ERROR: File not opened yet\n");
@@ -362,24 +353,26 @@ int sfs_close(int fd){
     // clear the open file table related to the directory
     open_file_table[fd].dirBlock = -1;
     open_file_count--;
-    return (0); 
+    return (0);
 }
 
-int sfs_getsize (int  fd)
+int sfs_getsize(int fd)
 {
     if (is_file_opened(fd) == -1)
     {
         printf("ERROR: File not opened yet!\n");
         return -1;
     }
-    if(open_file_table[fd].directoryEntry.size < 0){
+    if (open_file_table[fd].directoryEntry.size < 0)
+    {
         printf("ERROR: The file does not have a valid size!\n");
         return -1;
     }
-    return open_file_table[fd].directoryEntry.size; 
+    return open_file_table[fd].directoryEntry.size;
 }
 
-int sfs_read(int fd, void *buf, int n){
+int sfs_read(int fd, void *buf, int n)
+{
     if (is_file_opened(fd) == -1)
     {
         printf("ERROR: File not opened yet!\n");
@@ -402,23 +395,20 @@ int sfs_read(int fd, void *buf, int n){
     }
 
     // find the block range for acessing data in the file
-    int start_block_count = read_ptr_file  / BLOCKSIZE;
-    int start_block_offset = read_ptr_file  % BLOCKSIZE;
+    int start_block_count = read_ptr_file / BLOCKSIZE;
+    int start_block_offset = read_ptr_file % BLOCKSIZE;
 
-    int end_block_count = end_read_ptr_file  / BLOCKSIZE;
-    int end_block_offset = end_read_ptr_file  % BLOCKSIZE;
-    //printf("LOG(sfs_read)\n");
+    int end_block_count = end_read_ptr_file / BLOCKSIZE;
+    int end_block_offset = end_read_ptr_file % BLOCKSIZE;
     //printf("\tLOG(sfs_read): (start_block_count: %d, start_block_offset: %d ) \n", start_block_count, start_block_offset);
     //printf("\tLOG(sfs_read): (end_block_count: %d, end_block_offset: %d ) \n",  end_block_count, end_block_offset);
 
- 
     int index_block = get_index_block(open_file_table[fd].dirBlock, open_file_table[fd].dirBlockOffset);
     int byte_cnt = 0;
     void *buffer_ptr = buf;
-    //printf("\tLOG(sfs_read): START(byte_cnt %d ) \n", byte_cnt);
     // iterate until n bytes are read
     char block[BLOCKSIZE];
-    read_block((void *)block, index_block); 
+    read_block((void *)block, index_block);
 
     if (start_block_count == 0 && end_block_count == 0)
     {
@@ -426,22 +416,26 @@ int sfs_read(int fd, void *buf, int n){
         int index_block_ptr = fetch_next_index_block_ptr_from_offset(index_block, start_block_count);
         char block_data[BLOCKSIZE];
         read_block((void *)block_data, index_block_ptr);
-        for (int i = start_block_offset; i <  end_block_offset; i++)
+        for (int i = start_block_offset; i < end_block_offset; i++)
         {
             ((char *)(buffer_ptr))[0] = ((char *)(block_data + i))[0];
             buffer_ptr += 1;
             byte_cnt++;
         }
-        
-    } else {
-        for (int i = start_block_count; i < end_block_count; i++){
+    }
+    else
+    {
+        for (int i = start_block_count; i < end_block_count; i++)
+        {
             int index_block_ptr = fetch_next_index_block_ptr_from_offset(index_block, start_block_count);
-            if(index_block_ptr == -1){
+            if (index_block_ptr == -1)
+            {
                 printf("ERROR(CRITICAL): can't fetch the block in range to read/ not allocated yet!\n");
                 return -1;
             }
             // access the block
-            if(i == start_block_count){
+            if (i == start_block_count)
+            {
                 // take account the start offset
                 char block_data[BLOCKSIZE];
                 read_block((void *)block_data, index_block_ptr);
@@ -452,7 +446,8 @@ int sfs_read(int fd, void *buf, int n){
                     byte_cnt++;
                 }
             }
-            else if(i == end_block_count){
+            else if (i == end_block_count)
+            {
                 // take account the end offset
                 char block_data[BLOCKSIZE];
                 read_block((void *)block_data, index_block_ptr);
@@ -462,7 +457,9 @@ int sfs_read(int fd, void *buf, int n){
                     buffer_ptr += 1;
                     byte_cnt++;
                 }
-            } else {
+            }
+            else
+            {
                 // read the entire block
                 char block_data[BLOCKSIZE];
                 read_block((void *)block_data, index_block_ptr);
@@ -473,16 +470,13 @@ int sfs_read(int fd, void *buf, int n){
                     byte_cnt++;
                 }
             }
-           
         }
     }
-    
     //printf("\tLOG(sfs_read): END(byte_cnt %d ) \n", byte_cnt);
     // increment the file pointer
     open_file_table[fd].readPtr = end_read_ptr_file;
-    return byte_cnt; 
+    return byte_cnt;
 }
-
 
 int sfs_append(int fd, void *buf, int n)
 {
@@ -505,8 +499,6 @@ int sfs_append(int fd, void *buf, int n)
     }
 
     int size = open_file_table[fd].directoryEntry.size;
-    //printf("LOG(sfs_append): (filename: %s, fcb index: %d)\n", open_file_table[fd].directoryEntry.filename, fcbIndex);
-
     int dataBlockOffset = size % BLOCKSIZE;
     //printf("LOG(sfs_append): (data_block_offset: %d)\n", dataBlockOffset);
     if (dataBlockOffset == 0)
@@ -520,19 +512,19 @@ int sfs_append(int fd, void *buf, int n)
     {
         requiredBlockCount = 0;
     }
-    //printf("LOG(sfs_append): (required_block_count: %d)\n", requiredBlockCount);
     if (requiredBlockCount > free_block_count)
     {
         printf("ERROR: Not enough free blocks available!\n");
         return -1;
-    } 
+    }
 
     int index_block = get_index_block(open_file_table[fd].dirBlock, open_file_table[fd].dirBlockOffset);
     int byte_cnt = 0;
     while (byte_cnt != n)
     {
         // get a new block or use the allocated
-        if(dataBlockOffset == BLOCKSIZE || dataBlockOffset == 0){
+        if (dataBlockOffset == BLOCKSIZE || dataBlockOffset == 0)
+        {
             // allocate a new block
             int index_block_ptr = alloc_next_index_block_ptr(index_block);
             char block_data[BLOCKSIZE];
@@ -551,7 +543,9 @@ int sfs_append(int fd, void *buf, int n)
                 }
             }
             write_block((void *)block_data, index_block_ptr);
-        } else {
+        }
+        else
+        {
             // already data exists
             int index_block_ptr = fetch_next_index_block_ptr(index_block);
             char block_data[BLOCKSIZE];
@@ -569,7 +563,6 @@ int sfs_append(int fd, void *buf, int n)
                     return byte_cnt;
                 }
             }
-            // now we do not need to use an offset
             dataBlockOffset = 0;
             write_block((void *)block_data, index_block_ptr);
         }
@@ -608,12 +601,12 @@ int sfs_delete(char *filename)
             if (used_flag == USED_FLAG && strcmp(filename_buffer, filename) == 0)
             {
                 //printf("LOG(sfs_delete): find the file in the system!\n");
-                ((char*)(block + byte_pos + byte_pos_offset))[0] = NOT_USED_FLAG;
+                ((char *)(block + byte_pos + byte_pos_offset))[0] = NOT_USED_FLAG;
                 byte_pos_offset -= 4;
                 block_no_fcb = i;
                 block_offset_fcb = j;
                 byte_pos_offset -= 4;
-                ((char*)(block + byte_pos + byte_pos_offset))[0] = 0; // size = 0
+                ((char *)(block + byte_pos + byte_pos_offset))[0] = 0; // size = 0
                 write_block((void *)block, ROOT_DIR_START + i);
             }
         }
@@ -624,14 +617,14 @@ int sfs_delete(char *filename)
         printf("ERROR: Can't find any fcb associated with the file\n");
         return -1;
     }
-    
+
     // find the fcb block to deallocate
     char ablock[BLOCKSIZE];
     read_block((void *)ablock, block_no_fcb + FCB_START);
     int byte_pos = block_offset_fcb * FCB_SIZE;
-    ((int *)(ablock + byte_pos))[0] = NOT_USED_FLAG; // mark the fcb block as not used
-    index_block = ((char *)(ablock + byte_pos + 4))[0] ; // save the index block for further deallocation
-    ((int *)(ablock + byte_pos + 8))[0] = 0; // deallocate the size
+    ((int *)(ablock + byte_pos))[0] = NOT_USED_FLAG;    // mark the fcb block as not used
+    index_block = ((char *)(ablock + byte_pos + 4))[0]; // save the index block for further deallocation
+    ((int *)(ablock + byte_pos + 8))[0] = 0;            // deallocate the size
     write_block((void *)ablock, block_no_fcb + FCB_START);
 
     //deallocate the index block
@@ -642,12 +635,13 @@ int sfs_delete(char *filename)
     for (int j = 0; j < INDEXING_BLOCK_PTR_COUNT; j++)
     {
         index_block_offset = ((int *)(indexblock + j * DISK_PTR_SIZE))[0];
-        if(index_block_offset != -1){
+        if (index_block_offset != -1)
+        {
             // allocated space found
             //printf("LOG(sfs_delete):  (index_block_offset: %d)\n", index_block_offset);
             // mark the bit map not used  for deallocation
             set_bitmap_entry(index_block_offset, NOT_USED_FLAG);
-            // set the block to where offset points 
+            // set the block to where offset points
             ((int *)(indexblock + j * DISK_PTR_SIZE))[0] = -1; // mark as not allocated
             write_block((void *)indexblock, index_block);
             // populate the block position with -1
@@ -656,26 +650,27 @@ int sfs_delete(char *filename)
     }
 
     file_count--;
-    return (0); 
+    return (0);
 }
-
 
 /**********************************************************************
   Helper Functions
 ***********************************************************************/
 
-void init_superblock(int data_count){
+void init_superblock(int data_count)
+{
     char ablock[BLOCKSIZE];
-    ((int *)(ablock))[0] = data_count;  // block0 reserved for the superblock
-    ((int *)(ablock + 4))[0] = 0;      // the FCB entry (empty)
-    ((int *)(ablock + 8))[0] = data_count;  // free blocks
-    ((int *)(ablock + 12))[0] = 0; // number of files
+    ((int *)(ablock))[0] = data_count;     // block0 reserved for the superblock
+    ((int *)(ablock + 4))[0] = 0;          // the FCB entry (empty)
+    ((int *)(ablock + 8))[0] = data_count; // free blocks
+    ((int *)(ablock + 12))[0] = 0;         // number of files
     write_block((void *)ablock, SUPERBLOCK_START);
 }
 
-void init_bitmap(){
+void init_bitmap()
+{
     // 1) iterate over bitmap blocks
-    // 2) iterate over each bitmap bit 
+    // 2) iterate over each bitmap bit
     // 3) initialise the used bit to the 0 (to indicate free)
     // NOTE: each bit in bitmap shows whether a block allocated or not
     char block[BLOCKSIZE];
@@ -688,7 +683,6 @@ void init_bitmap(){
         write_block((void *)block, BITMAP_START + i);
     }
 }
-
 
 void init_FCB(int data_count)
 {
@@ -706,7 +700,6 @@ void init_FCB(int data_count)
     }
 }
 
-
 void init_root_directory()
 {
     char block[BLOCKSIZE];
@@ -722,8 +715,6 @@ void init_root_directory()
         write_block((void *)block, ROOT_DIR_START + i);
     }
 }
-
-
 
 void clear_open_file_table()
 {
@@ -748,19 +739,21 @@ int is_file_opened(int fd)
 /*
 ** initialise the volume information
 */
-void set_superblock(){
+void set_superblock()
+{
     char block[BLOCKSIZE];
     read_block((void *)block, SUPERBLOCK_START);
-    ((int *)(block + 4))[0] = empty_FCB_count;        
-    ((int *)(block + 8))[0] = free_block_count;  
-    ((int *)(block + 12))[0] = file_count;     
+    ((int *)(block + 4))[0] = empty_FCB_count;
+    ((int *)(block + 8))[0] = free_block_count;
+    ((int *)(block + 12))[0] = file_count;
     write_block((void *)block, SUPERBLOCK_START);
 };
 
 /*
 ** For the file descriptor initialise the direcory entry
 */
-void set_directory_entry(int fd){
+void set_directory_entry(int fd)
+{
     char block[BLOCKSIZE];
     // get the directory entry location responsible of the file
     read_block((void *)block, open_file_table[fd].dirBlock + ROOT_DIR_START);
@@ -777,25 +770,26 @@ void set_directory_entry(int fd){
 /*
 ** For the specified directory entry sets up the index block
 */
-void init_fcb_entry(int fcbIndex, int fcbBlock, int fcbOffset){
+void init_fcb_entry(int fcbIndex, int fcbBlock, int fcbOffset)
+{
     char block[BLOCKSIZE];
     read_block((void *)block, fcbBlock + FCB_START);
     int startByte = fcbOffset * FCB_SIZE;
     ((int *)(block + startByte))[0] = USED_FLAG;
     int index_block = get_next_available_index_block();
-    ((char *)(block + startByte + 4))[0] =  index_block; // initialise the content of index block with -1   
-    ((int *)(block + startByte + 8))[0] = 0; // size is 0 initially
+    ((char *)(block + startByte + 4))[0] = index_block; // initialise the content of index block with -1
+    ((int *)(block + startByte + 8))[0] = 0;            // size is 0 initially
     write_block((void *)block, fcbBlock + FCB_START);
     //printf("LOG(init_fcb_entry)\n");
     //printf("\tLOG(init_fcb_entry): (fcbIndex: %d) \n", fcbIndex);
     //printf("\tLOG(init_fcb_entry): (index block: %d) \n",  index_block);
 };
 
-
 /*
 ** For the specified block marks the availability on bitmap
 */
-void set_bitmap_entry(int block_no, int bit){
+void set_bitmap_entry(int block_no, int bit)
+{
     char block[BLOCKSIZE];
     read_block((void *)block, BITMAP_START);
     int startByte = block_no;
@@ -807,7 +801,8 @@ void set_bitmap_entry(int block_no, int bit){
 /*
 ** from the bitmap finds and returns the next available block in the system
 */
-int get_next_available_block(){
+int get_next_available_block()
+{
     char block[BLOCKSIZE];
     read_block((void *)block, BITMAP_START);
     int block_no = 0;
@@ -816,9 +811,10 @@ int get_next_available_block(){
         for (int j = 0; j < BITMAP_BIT_PER_BLOCK; j++)
         {
             int is_used = ((int *)(block + j * BITMAP_BIT_SIZE))[0];
-            if(is_used == NOT_USED_FLAG){
+            if (is_used == NOT_USED_FLAG)
+            {
                 ((int *)(block + j * BITMAP_BIT_SIZE))[0] = USED_FLAG; // mark as used
-                write_block((void *)block, BITMAP_START + i); // write the data to the disk
+                write_block((void *)block, BITMAP_START + i);          // write the data to the disk
                 //printf("LOG(get_next_available_block) (block no: %d)\n", block_no);
                 return block_no;
             }
@@ -835,10 +831,12 @@ int get_next_available_block(){
 *   TODO(zcankara) create connection between pointer pointing to the block
 *   return the (block no) allocated within the system
 */
-int get_next_available_index_block(){
+int get_next_available_index_block()
+{
     char block[BLOCKSIZE];
     int next_available_block = get_next_available_block();
-    if(next_available_block == -1){
+    if (next_available_block == -1)
+    {
         printf("ERROR: No block available!");
         return -1;
     }
@@ -858,13 +856,15 @@ int get_next_available_index_block(){
 /*
 ** within the index block finds the offset of the available position for allocation
 */
-int get_available_index_block_offset(int index_block){
+int get_available_index_block_offset(int index_block)
+{
     char block[BLOCKSIZE];
     read_block((void *)block, index_block);
     int index_block_offset = -1;
     for (int j = 0; j < INDEXING_BLOCK_PTR_COUNT; j++)
     {
-        if(((int *)(block + j * DISK_PTR_SIZE))[0] == -1){
+        if (((int *)(block + j * DISK_PTR_SIZE))[0] == -1)
+        {
             // available index block offset found
             index_block_offset = (j * DISK_PTR_SIZE);
             //printf("LOG(get_available_index_block_offset) (index block no: %d, index block offser %d)\n", index_block, index_block_offset);
@@ -875,11 +875,11 @@ int get_available_index_block_offset(int index_block){
     return index_block_offset;
 }
 
-
 /*
 * Returns the file disk block at the specificed index block and offset
 */
-int fetch_next_index_block_ptr_from_offset(int index_block, int index_block_offset){
+int fetch_next_index_block_ptr_from_offset(int index_block, int index_block_offset)
+{
     char block[BLOCKSIZE];
     read_block((void *)block, index_block);
     int index_block_ptr = ((int *)(block + index_block_offset * DISK_PTR_SIZE))[0];
@@ -891,12 +891,11 @@ int fetch_next_index_block_ptr_from_offset(int index_block, int index_block_offs
     return index_block_ptr;
 }
 
-
-
 /*
 * Returns the last block no where the last non empty block index no points at
 */
-int fetch_next_index_block_ptr(int index_block){
+int fetch_next_index_block_ptr(int index_block)
+{
     char block[BLOCKSIZE];
     read_block((void *)block, index_block);
     int prev_index_block_ptr = -1;
@@ -904,10 +903,13 @@ int fetch_next_index_block_ptr(int index_block){
     for (int j = 0; j < INDEXING_BLOCK_PTR_COUNT; j++)
     {
         index_block_ptr = ((int *)(block + j * DISK_PTR_SIZE))[0];
-        if(index_block_ptr == -1 && prev_index_block_ptr  == -1){
+        if (index_block_ptr == -1 && prev_index_block_ptr == -1)
+        {
             //printf("LOG NOOO BLOCK ALLOCATED YET");
             return -1;
-        } else if(index_block_ptr == -1){
+        }
+        else if (index_block_ptr == -1)
+        {
             return prev_index_block_ptr;
         }
         prev_index_block_ptr = index_block_ptr;
@@ -916,42 +918,45 @@ int fetch_next_index_block_ptr(int index_block){
     return -1;
 }
 
-
 /*
 * Populates contents of a disk block with -1
 * this process makes it ready to use by the file system
 */
-void init_file_block(int block_no){
+void init_file_block(int block_no)
+{
     char block[BLOCKSIZE];
     for (int i = 0; i < BLOCKSIZE; i++)
     {
-       ((int *)(block + i * BITMAP_BIT_SIZE))[0] = -1;
+        ((int *)(block + i * BITMAP_BIT_SIZE))[0] = -1;
     }
     write_block((void *)block, block_no);
 }
 
 /*
 * Allocates a new block in the index block
-* populates the block with -1's 
+* populates the block with -1's
 * returns the block no that is ready to use
 */
-int alloc_next_index_block_ptr(int index_block){
+int alloc_next_index_block_ptr(int index_block)
+{
     char block[BLOCKSIZE];
     read_block((void *)block, index_block);
     int index_block_offset = -1;
     for (int j = 0; j < INDEXING_BLOCK_PTR_COUNT; j++)
     {
         index_block_offset = ((int *)(block + j * DISK_PTR_SIZE))[0];
-        if(index_block_offset == -1){
+        if (index_block_offset == -1)
+        {
             // first empty position found
             //printf("LOG(alloc_index_block_ptr):  (index_block_offset: %d)\n", index_block_offset);
             // get an available block from the system
             int next_available_block = get_next_available_block();
-            if(next_available_block == -1){
+            if (next_available_block == -1)
+            {
                 printf("ERROR: No block available!");
                 return -1;
             }
-            // set the block to where offset points 
+            // set the block to where offset points
             ((int *)(block + j * DISK_PTR_SIZE))[0] = next_available_block;
             write_block((void *)block, index_block);
             //printf("LOG(alloc_index_block_ptr):  (available block: %d)\n", ((int *)(block + j * DISK_PTR_SIZE))[0]);
@@ -963,13 +968,12 @@ int alloc_next_index_block_ptr(int index_block){
     return -1;
 }
 
-
-
 /*
 ** initialises the superblock information
 *  global variables
 */
-void get_superblock(){
+void get_superblock()
+{
     char block[BLOCKSIZE];
     read_block((void *)block, SUPERBLOCK_START);
     data_count = ((int *)(block))[0];
@@ -986,12 +990,14 @@ void get_superblock(){
 /*
 ** from block number and block offset in root directory access the index block responsible of the file
 */
-int get_index_block(int block_no, int block_offset){
+int get_index_block(int block_no, int block_offset)
+{
     char block[BLOCKSIZE];
     read_block((void *)block, block_no + FCB_START);
     int startByte = block_offset * FCB_SIZE;
-    int index_block =  ((char *)(block + startByte + 4))[0];
-    if(index_block == -1){
+    int index_block = ((char *)(block + startByte + 4))[0];
+    if (index_block == -1)
+    {
         printf("ERROR: Block not initialised yet!");
         return -1;
     }

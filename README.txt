@@ -1,12 +1,13 @@
 Zeynep Cankara - 21703381
 
+Implementation of a simple file system with indexed allocation
 
 Contents:
 - simplefs.c
-- simplefs.h  
+- simplefs.h
 - test.c (contains the experiments for the tests)
 - Makefile
-- report.pdf (contains experimental results) 
+- report.pdf (contains experimental results)
 
 How to Run:
 
@@ -20,7 +21,7 @@ $ make
 
 - Running the program:
 $ ./create_format <FILENAME> <SIZE>
-$ ./app <FILENAME>  
+$ ./app <FILENAME>
 
 - Running the test (for experiments in the report):
 $ ./test
