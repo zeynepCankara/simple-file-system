@@ -9,6 +9,7 @@ Implementation of a simple file system with indexed allocation
 - Makefile
 - test.c (contains the experiments for the tests)
 - report.pdf (contains experimental results)
+- Project4.pdf (project description)
 
 ## How to Run
 
